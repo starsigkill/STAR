@@ -5,6 +5,9 @@
 #include "steam/steam_utils.h"
 #include "overlay/overlay.h"
 #include "steam/isteamuserstats.h"
+#include <thread>
+#include <filesystem>
+#include <mmsystem.h>
 
 StarSteamUserStats& StarSteamUserStats::get()
 {
@@ -180,6 +183,20 @@ bool StarSteamUserStats::SetAchievement(const char* pchName)
     return true;
 }
 
+static void play_achievement_sound()
+{
+    std::string sound_path = Settings::get().settings_dir + "\\Sounds\\achievement.mp3";
+    if (!std::filesystem::exists(sound_path)) return;
+
+    std::thread([sound_path]() {
+        std::string open_cmd = "open \"" + sound_path + "\" type mpegvideo alias star_ach";
+        if (mciSendStringA(open_cmd.c_str(), nullptr, 0, nullptr) == 0) {
+            mciSendStringA("play star_ach wait", nullptr, 0, nullptr);
+            mciSendStringA("close star_ach", nullptr, 0, nullptr);
+        }
+    }).detach();
+}
+
 void StarSteamUserStats::notify_achievement_unlock(const std::string& name)
 {
 
@@ -203,11 +220,13 @@ void StarSteamUserStats::notify_achievement_unlock(const std::string& name)
                     StarSteamUtils::get().GetImageRGBA(handle, icon_rgba.data(), (int)icon_rgba.size());
                 }
             }
+            play_achievement_sound();
             StarOverlay::get().push_achievement(def.display_name, def.description, icon_rgba, icon_w, icon_h);
             return;
         }
     }
 
+    play_achievement_sound();
     StarOverlay::get().push_achievement(name, "", {}, 0, 0);
 }
 

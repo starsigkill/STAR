@@ -147,6 +147,7 @@ target_link_libraries(star PRIVATE
     opengl32
     bcrypt
     ws2_32
+    winmm
 )
 
 # Set output name and linker flags based on architecture
