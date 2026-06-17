@@ -81,6 +81,8 @@ Put an `achievements.json` in your `STAR/` folder:
 
 Icon paths are relative to the `STAR/` directory. You can unlock and reset achievements live from the overlay.
 
+**Achievement sound** (optional): drop an MP3 at `STAR/Sounds/achievement.mp3` and it plays automatically whenever an achievement is unlocked or test-fired from the overlay.
+
 ---
 
 ## overlay
@@ -130,6 +132,7 @@ All `.star` files are INI-format. On first load, STAR stamps a small ASCII art h
 | `languages.star` | list of languages the game claims to support |
 | `overlay.star` | enable/disable the overlay |
 | `achievements.json` | achievement definitions |
+| `Sounds/achievement.mp3` | sound played on achievement unlock (optional) |
 
 ---
 
