@@ -389,18 +389,17 @@ STAR_EXPORT void* SteamInternal_ContextInit(void* pContextInitData)
     if (!pContextInitData) return nullptr;
 
     uintptr_t* data = (uintptr_t*)pContextInitData;
+    void* local_ctx = &data[2];
 
-    void(*fn)(void*) = (void(*)(void*))data[0];
-    uintptr_t stored_counter = data[1];
-
-    if (stored_counter != g_lifetime_counter) {
+    if (data[1] != g_lifetime_counter) {
+        void(*fn)(void*) = (void(*)(void*))data[0];
         data[1] = g_lifetime_counter;
         if (fn) {
             fn(pContextInitData);
         }
     }
 
-    return &data[2];
+    return local_ctx;
 }
 
 STAR_EXPORT void* SteamInternal_CreateInterface(const char* ver)

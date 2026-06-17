@@ -22,6 +22,7 @@
 #include "steam/steam_unified_messages.h"
 #include "steam/steam_game_server.h"
 #include "steam/steam_game_server_stats.h"
+#include "steam/steam_input.h"
 #include "steam/isteamclient.h"
 
 StarSteamClient& StarSteamClient::get()
@@ -171,6 +172,7 @@ void* StarSteamClient::GetISteamGenericInterface(HSteamUser h, HSteamPipe p, con
     if (strstr(ver, "STEAMREMOTESTORAGE")) return GetISteamRemoteStorage(1, 1, ver);
     if (strstr(ver, "STEAMSCREENSHOTS")) return &StarSteamScreenshots::get();
     if (strstr(ver, "STEAMHTTP")) return &StarSteamHTTP::get();
+    if (strstr(ver, "SteamInput")) return &StarSteamInput::get();
     if (strstr(ver, "SteamController")) return &StarSteamController::get();
     if (strstr(ver, "STEAMUGC")) return &StarSteamUGC::get();
     if (strstr(ver, "STEAMHTMLSURFACE")) return &StarSteamHTMLSurface::get();
@@ -341,7 +343,7 @@ void StarSteamClient::Set_SteamAPI_CPostAPIResultInProcess(SteamAPI_PostAPIResul
 void StarSteamClient::Remove_SteamAPI_CPostAPIResultInProcess(SteamAPI_PostAPIResultInProcess_t func) { STAR_UNREFERENCED(func); }
 
 ISteamGameSearch* StarSteamClient::GetISteamGameSearch(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamGameSearch*>(g_dummy_interface); }
-ISteamInput* StarSteamClient::GetISteamInput(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamInput*>(g_dummy_interface); }
+ISteamInput* StarSteamClient::GetISteamInput(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return &StarSteamInput::get(); }
 ISteamParties* StarSteamClient::GetISteamParties(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamParties*>(g_dummy_interface); }
 ISteamRemotePlay* StarSteamClient::GetISteamRemotePlay(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamRemotePlay*>(g_dummy_interface); }
 

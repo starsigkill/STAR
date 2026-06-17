@@ -94,6 +94,7 @@ set(STAR_SOURCES
     src/steam/steam_game_server_stats.cpp
     src/steam/steam_html_surface.cpp
     src/steam/steam_http.cpp
+    src/steam/steam_input.cpp
     src/steam/steam_inventory.cpp
     src/steam/steam_matchmaking.cpp
     src/steam/steam_matchmaking_servers.cpp
@@ -163,6 +164,7 @@ set_target_properties(star PROPERTIES
 
 if(MSVC)
     target_compile_options(star PRIVATE /W3 /MP)
+    target_link_options(star PRIVATE $<$<CONFIG:Debug>:/MAP>)
     # Debug info in release for debugging if needed
     target_compile_options(star PRIVATE $<$<CONFIG:Release>:/Zi>)
 endif()
