@@ -2138,7 +2138,7 @@ ImTextureID StarOverlay::upload_icon_vulkan(const std::vector<uint8_t>& rgba, in
     data->icon_memories.push_back(img_mem);
     data->icon_views.push_back(view);
 
-    return ImGui_ImplVulkan_AddTexture(data->icon_sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    return reinterpret_cast<ImTextureID>(ImGui_ImplVulkan_AddTexture(data->icon_sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
 }
 
 void StarOverlay::cleanup_vulkan()
