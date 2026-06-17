@@ -1,0 +1,71 @@
+# ==========================================
+# STAR Project Gitignore
+# ==========================================
+
+# --- Build Directories ---
+/build/
+/build64/
+/dist/
+/out/
+CMakeCache.txt
+CMakeFiles/
+CMakeSettings.json
+CMakeUserPresets.json
+art.txt
+
+# --- Compiler / Linker Outputs ---
+*.obj
+*.o
+*.lo
+*.slo
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.map
+*.spec
+
+# --- Visual Studio Artifacts ---
+.vs/
+*.user
+*.suo
+*.sln.docstates
+*.suo.tmp
+*.ncb
+*.db
+*.opendb
+*.VC.db
+*.ipch
+*.aps
+
+# --- Runtime Generated & Configuration ---
+/STAR/
+*.log
+
+# --- Python & PyInstaller ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+/pyinstaller_work/
+/tools/dist/
+/tools/build/
+
+# --- IDEs / Text Editors ---
+.vscode/
+.idea/
+*.ntvs*
+*.njsproj
+*.sln
+.claude
+
+# --- OS-specific ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini

@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure x86 (Win32)
+        run: cmake -B build -A Win32
+
+      - name: Build x86 (Win32)
+        run: cmake --build build --config Release
+
+      - name: Configure x64
+        run: cmake -B build64 -A x64
+
+      - name: Build x64
+        run: cmake --build build64 --config Release
+
+      - name: Upload steam_api.dll (x86)
+        uses: actions/upload-artifact@v4
+        with:
+          name: steam_api-x86
+          path: build/Release/steam_api.dll
+
+      - name: Upload steam_api64.dll (x64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: steam_api64-x64
+          path: build64/Release/steam_api64.dll
