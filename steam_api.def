@@ -162,6 +162,62 @@ EXPORTS
     SteamAPI_ManualDispatch_GetNextCallback
     SteamAPI_ManualDispatch_FreeLastCallback
     SteamAPI_ManualDispatch_GetAPICallResult
+    SteamAPI_SteamUser_v020
+    SteamAPI_SteamUser_v021
+    SteamAPI_SteamUser_v022
+    SteamAPI_SteamUser_v023
+    SteamAPI_SteamFriends_v017
+    SteamAPI_SteamFriends_v018
+    SteamAPI_SteamUtils_v009
+    SteamAPI_SteamUtils_v010
+    SteamAPI_SteamGameServerUtils_v009
+    SteamAPI_SteamGameServerUtils_v010
+    SteamAPI_SteamMatchmaking_v009
+    SteamAPI_SteamMatchmakingServers_v002
+    SteamAPI_SteamUserStats_v011
+    SteamAPI_SteamUserStats_v012
+    SteamAPI_SteamUserStats_v013
+    SteamAPI_SteamApps_v008
+    SteamAPI_SteamApps_v009
+    SteamAPI_SteamGameServerApps_v008
+    SteamAPI_SteamGameServerApps_v009
+    SteamAPI_SteamNetworking_v006
+    SteamAPI_SteamGameServerNetworking_v006
+    SteamAPI_SteamRemoteStorage_v014
+    SteamAPI_SteamRemoteStorage_v016
+    SteamAPI_SteamScreenshots_v003
+    SteamAPI_SteamHTTP_v003
+    SteamAPI_SteamGameServerHTTP_v003
+    SteamAPI_SteamInput_v001
+    SteamAPI_SteamInput_v002
+    SteamAPI_SteamInput_v005
+    SteamAPI_SteamInput_v006
+    SteamAPI_SteamController_v007
+    SteamAPI_SteamController_v008
+    SteamAPI_SteamUGC_v014
+    SteamAPI_SteamUGC_v015
+    SteamAPI_SteamUGC_v016
+    SteamAPI_SteamUGC_v017
+    SteamAPI_SteamUGC_v018
+    SteamAPI_SteamUGC_v019
+    SteamAPI_SteamUGC_v020
+    SteamAPI_SteamUGC_v021
+    SteamAPI_SteamGameServerUGC_v014
+    SteamAPI_SteamAppList_v001
+    SteamAPI_SteamHTMLSurface_v005
+    SteamAPI_SteamInventory_v003
+    SteamAPI_SteamGameServerInventory_v003
+    SteamAPI_SteamVideo_v001
+    SteamAPI_SteamVideo_v002
+    SteamAPI_SteamVideo_v007
+    SteamAPI_SteamMusic_v001
+    SteamAPI_SteamMusicRemote_v001
+    SteamAPI_SteamNetworkingSockets_v008
+    SteamAPI_SteamGameServerNetworkingSockets_v008
+    SteamAPI_SteamNetworkingUtils_v003
+    SteamAPI_SteamParentalSettings_v001
+    SteamAPI_SteamParties_v002
+    SteamAPI_SteamRemotePlay_v001
     GetHSteamPipe
     GetHSteamUser
     SteamAPI_SetBreakpadAppID
@@ -252,3 +308,11 @@ EXPORTS
     SteamAPI_ISteamUtils_GetAPICallFailureReason
     SteamAPI_ISteamUtils_GetAPICallResult
     SteamAPI_ISteamUtils_IsAPICallCompleted
+    SteamAPI_ISteamFriends_GetFriendPersonaName
+    SteamAPI_ISteamFriends_GetFriendMessage
+    SteamAPI_ISteamUser_GetVoiceOptimalSampleRate
+    SteamAPI_ISteamMatchmaking_GetLobbyChatEntry
+    SteamAPI_ISteamInventory_DestroyResult
+    SteamAPI_ISteamInventory_GetItemDefinitionIDs
+    SteamAPI_ISteamInventory_GetResultItemProperty
+    SteamAPI_ISteamInventory_GetResultItems

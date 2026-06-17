@@ -23,6 +23,11 @@
 #include "steam/steam_game_server.h"
 #include "steam/steam_game_server_stats.h"
 #include "steam/steam_input.h"
+#include "steam/steam_networking_sockets.h"
+#include "steam/steam_networking_utils.h"
+#include "steam/steam_parental_settings.h"
+#include "steam/steam_parties.h"
+#include "steam/steam_remote_play.h"
 #include "steam/isteamclient.h"
 
 StarSteamClient& StarSteamClient::get()
@@ -168,6 +173,8 @@ void* StarSteamClient::GetISteamGenericInterface(HSteamUser h, HSteamPipe p, con
     if (strstr(ver, "STEAMUSERSTATS")) return GetISteamUserStats(1, 1, ver);
     if (strstr(ver, "STEAMAPPLIST")) return &StarSteamAppList::get();
     if (strstr(ver, "STEAMAPPS") || strstr(ver, "SteamApps")) return GetISteamApps(1, 1, ver);
+    if (strstr(ver, "SteamNetworkingSockets")) return &StarSteamNetworkingSockets::get();
+    if (strstr(ver, "SteamNetworkingUtils")) return &StarSteamNetworkingUtils::get();
     if (strstr(ver, "SteamNetworking")) return &StarSteamNetworking::get();
     if (strstr(ver, "STEAMREMOTESTORAGE")) return GetISteamRemoteStorage(1, 1, ver);
     if (strstr(ver, "STEAMSCREENSHOTS")) return &StarSteamScreenshots::get();
@@ -179,6 +186,9 @@ void* StarSteamClient::GetISteamGenericInterface(HSteamUser h, HSteamPipe p, con
     if (strstr(ver, "STEAMINVENTORY")) return &StarSteamInventory::get();
     if (strstr(ver, "STEAMVIDEO")) return &StarSteamVideo::get();
     if (strstr(ver, "STEAMUNIFIEDMESSAGES")) return &StarSteamUnifiedMessages::get();
+    if (strstr(ver, "STEAMPARENTALSETTINGS")) return &StarSteamParentalSettings::get();
+    if (strstr(ver, "SteamParentalSettings")) return &StarSteamParentalSettings::get();
+    if (strstr(ver, "STEAMPARTIES") || strstr(ver, "SteamParties")) return &StarSteamParties::get();
     STAR_LOG("GetISteamGenericInterface: unhandled interface '%s', returning dummy pointer", ver);
     return g_dummy_interface;
 }
@@ -330,7 +340,7 @@ ISteamVideo* StarSteamClient::GetISteamVideo(HSteamUser h, HSteamPipe p, const c
 ISteamParentalSettings* StarSteamClient::GetISteamParentalSettings(HSteamUser h, HSteamPipe p, const char* ver)
 {
     STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver);
-    return reinterpret_cast<ISteamParentalSettings*>(g_dummy_interface);
+    return &StarSteamParentalSettings::get();
 }
 
 ISteamUnifiedMessages* StarSteamClient::GetISteamUnifiedMessages(HSteamUser h, HSteamPipe p, const char* ver)
@@ -344,8 +354,8 @@ void StarSteamClient::Remove_SteamAPI_CPostAPIResultInProcess(SteamAPI_PostAPIRe
 
 ISteamGameSearch* StarSteamClient::GetISteamGameSearch(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamGameSearch*>(g_dummy_interface); }
 ISteamInput* StarSteamClient::GetISteamInput(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return &StarSteamInput::get(); }
-ISteamParties* StarSteamClient::GetISteamParties(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamParties*>(g_dummy_interface); }
-ISteamRemotePlay* StarSteamClient::GetISteamRemotePlay(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamRemotePlay*>(g_dummy_interface); }
+ISteamParties* StarSteamClient::GetISteamParties(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return &StarSteamParties::get(); }
+ISteamRemotePlay* StarSteamClient::GetISteamRemotePlay(HSteamUser h, HSteamPipe p, const char* ver) { STAR_UNREFERENCED(h); STAR_UNREFERENCED(p); STAR_UNREFERENCED(ver); return reinterpret_cast<ISteamRemotePlay*>(&StarSteamRemotePlay::get()); }
 
 void StarSteamClient::SetLocalIPBinding(const SteamIPAddress_t& unIP, uint16 usPort) { STAR_UNREFERENCED(unIP); STAR_UNREFERENCED(usPort); }
 void StarSteamClient::DestroyAllInterfaces() {}
