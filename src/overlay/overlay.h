@@ -1,6 +1,7 @@
 #pragma once
 #include "core/star_common.h"
 #include <dxgi1_4.h>
+#include "imgui.h"
 
 struct AchievementNotification {
     std::string title;
@@ -37,14 +38,16 @@ private:
     void render_frame(IDXGISwapChain* chain);
     void init_imgui(IDXGISwapChain* chain);
     void cleanup_rtv();
-    ID3D11ShaderResourceView* get_or_create_icon(const std::string& key,
-                                                  const std::vector<uint8_t>& rgba, int w, int h);
+    ImTextureID get_or_create_icon(const std::string& key,
+                                   const std::vector<uint8_t>& rgba, int w, int h);
 
 #ifdef _WIN64
     void on_present_dx12(IDXGISwapChain* chain);
     void init_imgui_dx12(IDXGISwapChain* chain, void* device, void* command_queue);
     void render_frame_dx12(IDXGISwapChain* chain);
     void cleanup_dx12();
+    void hook_dx12_ecl();
+    ImTextureID upload_icon_dx12(const std::vector<uint8_t>& rgba, int w, int h);
 #endif
 
     using DX9PresentFn = HRESULT(STDMETHODCALLTYPE*)(struct IDirect3DDevice9*, const RECT*, const RECT*, HWND, const struct RGNDATA*);
@@ -84,6 +87,7 @@ private:
     void init_imgui_vulkan(void* queue, const void* pPresentInfo);
     void render_frame_vulkan(void* queue, const void* pPresentInfo);
     void cleanup_vulkan();
+    ImTextureID upload_icon_vulkan(const std::vector<uint8_t>& rgba, int w, int h);
 
     void render_notifications(float dt);
     void render_panel();
@@ -93,6 +97,7 @@ private:
     bool  enabled_           = true;
     bool  imgui_initialized_ = false;
     bool  hook_attempted_    = false;
+    bool  hooks_installed_   = false;
     bool  open_              = false;
     float panel_anim_        = 0.0f;
     float scroll_target_y_   = -1.0f;
@@ -114,15 +119,22 @@ private:
     std::vector<void*> dx12_command_allocators_;
     std::vector<void*> dx12_resources_;
     UINT dx12_buffer_count_ = 0;
+    UINT dx12_srv_next_slot_ = 1;
+    std::vector<void*> dx12_icon_resources_;
+
+    using ExecuteCommandListsFn = void(STDMETHODCALLTYPE*)(void*, UINT, void* const*);
+    ExecuteCommandListsFn orig_execute_command_lists_ = nullptr;
+    static void STDMETHODCALLTYPE hooked_ExecuteCommandLists(void* queue, UINT count, void* const* lists);
+    static void* g_dx12_captured_queue_;
 #endif
 
     void* font_small_ = nullptr;
     void* font_title_ = nullptr;
 
-    std::mutex                           render_mutex_;
-    std::mutex                           notif_mutex_;
+    std::mutex                        render_mutex_;
+    std::mutex                        notif_mutex_;
     std::vector<AchievementNotification> notifications_;
-    std::unordered_map<std::string, ID3D11ShaderResourceView*> icon_textures_;
+    std::unordered_map<std::string, ImTextureID> icon_textures_;
 
     using PresentFn       = HRESULT (STDMETHODCALLTYPE*)(IDXGISwapChain*, UINT, UINT);
     using Present1Fn      = HRESULT (STDMETHODCALLTYPE*)(IDXGISwapChain1*, UINT, UINT, const DXGI_PRESENT_PARAMETERS*);

@@ -17,6 +17,9 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
 static StarOverlay* g_overlay = nullptr;
+#ifdef _WIN64
+void* StarOverlay::g_dx12_captured_queue_ = nullptr;
+#endif
 
 static float clamp01(float v) { return v < 0.f ? 0.f : v > 1.f ? 1.f : v; }
 static float easeOut(float t) { float f = 1.f - t; return 1.f - f * f * f; }
@@ -109,6 +112,7 @@ void StarOverlay::init()
     g_overlay = this;
     enabled_  = Settings::get().overlay_enabled;
     if (!enabled_) return;
+    if (hooks_installed_) return;
     if (MH_Initialize() != MH_OK) STAR_LOG("MinHook init failed");
 
     HMODULE user32 = GetModuleHandleA("user32.dll");
@@ -135,6 +139,7 @@ void StarOverlay::init()
     hook_dx11();
     hook_opengl();
     hook_vulkan();
+    hooks_installed_ = true;
 }
 
 void StarOverlay::hook_window()
@@ -152,6 +157,7 @@ void StarOverlay::shutdown()
 {
     if (!enabled_) return;
     std::lock_guard<std::mutex> lock(render_mutex_);
+    GraphicsAPI api_snapshot = active_api_;
 
     while (cursor_show_count_offset_ > 0) {
         if (orig_show_cursor_) orig_show_cursor_(FALSE); else ShowCursor(FALSE);
@@ -193,10 +199,16 @@ void StarOverlay::shutdown()
 #endif
     cleanup_vulkan();
 
-    for (auto& [k, v] : icon_textures_) if (v) v->Release();
+    if (api_snapshot == GraphicsAPI::DX11 || api_snapshot == GraphicsAPI::DX9) {
+        for (auto& [k, v] : icon_textures_) if (v) ((ID3D11ShaderResourceView*)v)->Release();
+    }
     icon_textures_.clear();
     if (context_) { context_->Release(); context_ = nullptr; }
     if (device_)  { device_->Release();  device_  = nullptr; }
+    hook_attempted_ = false;
+    hooks_installed_ = false;
+    MH_DisableHook(MH_ALL_HOOKS);
+    MH_RemoveHook(MH_ALL_HOOKS);
     MH_Uninitialize();
     g_overlay = nullptr;
 }
@@ -242,7 +254,48 @@ void StarOverlay::hook_dx11()
 
     dsc->Release(); ddev->Release(); DestroyWindow(dummy);
     STAR_LOG("DX11 hooked");
+
+#ifdef _WIN64
+    hook_dx12_ecl();
+#endif
 }
+
+#ifdef _WIN64
+void StarOverlay::hook_dx12_ecl()
+{
+    if (orig_execute_command_lists_) return;
+
+    typedef HRESULT(WINAPI* PFN_D3D12CreateDevice)(IUnknown*, D3D_FEATURE_LEVEL, REFIID, void**);
+    HMODULE hD3D12 = GetModuleHandleA("d3d12.dll");
+    if (!hD3D12) hD3D12 = LoadLibraryA("d3d12.dll");
+    if (!hD3D12) { STAR_LOG("DX12 ECL: d3d12.dll not found"); return; }
+
+    auto pfnCreate = (PFN_D3D12CreateDevice)GetProcAddress(hD3D12, "D3D12CreateDevice");
+    if (!pfnCreate) { STAR_LOG("DX12 ECL: D3D12CreateDevice export not found"); return; }
+
+    ID3D12Device* dummy_dev = nullptr;
+    HRESULT hr = pfnCreate(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&dummy_dev));
+    if (FAILED(hr)) { STAR_LOG("DX12 ECL: D3D12CreateDevice failed hr=0x%08x", (unsigned)hr); return; }
+
+    D3D12_COMMAND_QUEUE_DESC cqdesc = {};
+    cqdesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    ID3D12CommandQueue* dummy_queue = nullptr;
+    if (SUCCEEDED(dummy_dev->CreateCommandQueue(&cqdesc, IID_PPV_ARGS(&dummy_queue)))) {
+        void** vt12 = *(void***)dummy_queue;
+        MH_STATUS mh = MH_CreateHook(vt12[10], &hooked_ExecuteCommandLists, (void**)&orig_execute_command_lists_);
+        if (mh == MH_OK) {
+            MH_EnableHook(vt12[10]);
+            STAR_LOG("DX12 ExecuteCommandLists hooked");
+        } else {
+            STAR_LOG("DX12 ECL: MH_CreateHook failed status=%d", (int)mh);
+        }
+        dummy_queue->Release();
+    } else {
+        STAR_LOG("DX12 ECL: CreateCommandQueue failed");
+    }
+    dummy_dev->Release();
+}
+#endif
 
 void StarOverlay::setup_imgui_style_and_fonts()
 {
@@ -334,27 +387,38 @@ void StarOverlay::cleanup_rtv()
     if (rtv_) { rtv_->Release(); rtv_ = nullptr; }
 }
 
-ID3D11ShaderResourceView* StarOverlay::get_or_create_icon(
+ImTextureID StarOverlay::get_or_create_icon(
     const std::string& key, const std::vector<uint8_t>& rgba, int w, int h)
 {
     auto it = icon_textures_.find(key);
     if (it != icon_textures_.end()) return it->second;
 
-    ID3D11ShaderResourceView* srv = nullptr;
-    if (!rgba.empty() && w > 0 && h > 0 && device_) {
-        D3D11_TEXTURE2D_DESC td{};
-        td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
-        td.Format = DXGI_FORMAT_R8G8B8A8_UNORM; td.SampleDesc.Count = 1;
-        td.Usage = D3D11_USAGE_DEFAULT; td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-        D3D11_SUBRESOURCE_DATA srd{ rgba.data(), (UINT)(w*4), 0 };
-        ID3D11Texture2D* tex = nullptr;
-        if (SUCCEEDED(device_->CreateTexture2D(&td, &srd, &tex))) {
-            device_->CreateShaderResourceView(tex, nullptr, &srv);
-            tex->Release();
+    ImTextureID tex_id = nullptr;
+    if (!rgba.empty() && w > 0 && h > 0) {
+#ifdef _WIN64
+        if (active_api_ == GraphicsAPI::DX12) {
+            tex_id = upload_icon_dx12(rgba, w, h);
+        } else
+#endif
+        if (active_api_ == GraphicsAPI::Vulkan) {
+            tex_id = upload_icon_vulkan(rgba, w, h);
+        } else if (device_) {
+            D3D11_TEXTURE2D_DESC td{};
+            td.Width = w; td.Height = h; td.MipLevels = 1; td.ArraySize = 1;
+            td.Format = DXGI_FORMAT_R8G8B8A8_UNORM; td.SampleDesc.Count = 1;
+            td.Usage = D3D11_USAGE_DEFAULT; td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            D3D11_SUBRESOURCE_DATA srd{ rgba.data(), (UINT)(w*4), 0 };
+            ID3D11Texture2D* tex = nullptr;
+            if (SUCCEEDED(device_->CreateTexture2D(&td, &srd, &tex))) {
+                ID3D11ShaderResourceView* srv = nullptr;
+                device_->CreateShaderResourceView(tex, nullptr, &srv);
+                tex->Release();
+                tex_id = (ImTextureID)(void*)srv;
+            }
         }
     }
-    icon_textures_[key] = srv;
-    return srv;
+    icon_textures_[key] = tex_id;
+    return tex_id;
 }
 
 void StarOverlay::render_frame(IDXGISwapChain* chain)
@@ -444,9 +508,9 @@ void StarOverlay::render_notifications(float dt)
         dl->AddRectFilled({x, y+3.f}, {x+3.f, y+H-3.f}, col(P_ACC, a), 2.f);
 
         float ix = x + 11.f, iy = y + (H - 44.f) * .5f, is = 44.f;
-        auto* srv = get_or_create_icon(n.title, n.icon_rgba, n.icon_width, n.icon_height);
-        if (srv) {
-            dl->AddImageRounded((ImTextureID)(void*)srv,
+        ImTextureID notif_tex = get_or_create_icon(n.title, n.icon_rgba, n.icon_width, n.icon_height);
+        if (notif_tex) {
+            dl->AddImageRounded(notif_tex,
                 {ix,iy},{ix+is,iy+is},{0,0},{1,1}, col(0xff,0xff,0xff,a), 4.f);
         } else {
             dl->AddRectFilled({ix,iy},{ix+is,iy+is}, col(P_BG2, a), 4.f);
@@ -655,15 +719,16 @@ void StarOverlay::render_panel()
         float ix2 = rmin.x + ICON_X;
         float iy2 = rmin.y + (ROW_H - ICON_S) * .5f;
 
-        std::string ikey = "p_" + def.name;
-        ID3D11ShaderResourceView* srv = nullptr;
+        std::string ikey = (got ? "p_" : "g_") + def.name;
+        ImTextureID icon_tex = nullptr;
         auto icit = icon_textures_.find(ikey);
         if (icit != icon_textures_.end()) {
-            srv = icit->second;
+            icon_tex = icit->second;
         } else {
             std::vector<uint8_t> rgba; int iw = 0, ih = 0;
-            if (!def.icon_path.empty()) {
-                std::string full = Settings::get().settings_dir + "\\" + def.icon_path;
+            const std::string& icon_path = got ? def.icon_path : def.icon_gray_path;
+            if (!icon_path.empty()) {
+                std::string full = Settings::get().settings_dir + "\\" + icon_path;
                 for (char& c : full) if (c == '/') c = '\\';
                 int h = StarSteamUtils::get().LoadImageFromFile(full);
                 if (h > 0) {
@@ -674,12 +739,12 @@ void StarOverlay::render_panel()
                     StarSteamUtils::get().GetImageRGBA(h, rgba.data(), (int)rgba.size());
                 }
             }
-            srv = get_or_create_icon(ikey, rgba, iw, ih);
+            icon_tex = get_or_create_icon(ikey, rgba, iw, ih);
         }
-        if (srv) {
-            dl->AddImageRounded((ImTextureID)(void*)srv,
+        if (icon_tex) {
+            dl->AddImageRounded(icon_tex,
                 {ix2,iy2},{ix2+ICON_S,iy2+ICON_S},{0,0},{1,1},
-                IM_COL32(255,255,255, got ? 255 : 120), 3.f);
+                IM_COL32(255,255,255, 255), 3.f);
         } else {
             dl->AddRectFilled({ix2,iy2},{ix2+ICON_S,iy2+ICON_S},
                 col(P_BG2, 1.f), 3.f);
@@ -766,6 +831,18 @@ void StarOverlay::push_achievement(const std::string& name, const std::string& d
     notifications_.push_back(std::move(n));
 }
 
+#ifdef _WIN64
+void STDMETHODCALLTYPE StarOverlay::hooked_ExecuteCommandLists(void* queue, UINT count, void* const* lists)
+{
+    if (!g_dx12_captured_queue_) {
+        g_dx12_captured_queue_ = queue;
+        STAR_LOG("DX12 command queue captured");
+    }
+    if (g_overlay && g_overlay->orig_execute_command_lists_)
+        g_overlay->orig_execute_command_lists_(queue, count, lists);
+}
+#endif
+
 HRESULT STDMETHODCALLTYPE StarOverlay::hooked_Present(IDXGISwapChain* sc, UINT si, UINT fl)
 {
     if (g_overlay && !(fl & DXGI_PRESENT_TEST)) g_overlay->on_present(sc, si, fl);
@@ -792,20 +869,30 @@ void StarOverlay::on_present(IDXGISwapChain* chain, UINT si, UINT fl)
     if (!enabled_) return;
 
     if (!imgui_initialized_) {
+        static bool logged_attempt = false;
+        if (!logged_attempt) { logged_attempt = true; STAR_LOG("on_present: attempting imgui init"); }
         ID3D11Device* d3d11_device = nullptr;
         if (SUCCEEDED(chain->GetDevice(__uuidof(ID3D11Device), (void**)&d3d11_device))) {
             d3d11_device->Release();
             init_imgui(chain);
         } else {
+            static bool logged_dx11_fail = false;
+            if (!logged_dx11_fail) { logged_dx11_fail = true; STAR_LOG("on_present: DX11 device not found, using DX12 path"); }
 #ifdef _WIN64
-            ID3D12CommandQueue* command_queue = nullptr;
-            if (SUCCEEDED(chain->GetDevice(__uuidof(ID3D12CommandQueue), (void**)&command_queue))) {
+            if (!orig_execute_command_lists_) {
+                hook_dx12_ecl();
+                return;
+            }
+            if (g_dx12_captured_queue_) {
                 ID3D12Device* d3d12_device = nullptr;
-                if (SUCCEEDED(command_queue->GetDevice(__uuidof(ID3D12Device), (void**)&d3d12_device))) {
-                    init_imgui_dx12(chain, d3d12_device, command_queue);
+                auto* queue = (ID3D12CommandQueue*)g_dx12_captured_queue_;
+                if (SUCCEEDED(queue->GetDevice(__uuidof(ID3D12Device), (void**)&d3d12_device))) {
+                    init_imgui_dx12(chain, d3d12_device, g_dx12_captured_queue_);
                     d3d12_device->Release();
+                } else {
+                    static bool logged_queue_fail = false;
+                    if (!logged_queue_fail) { logged_queue_fail = true; STAR_LOG("on_present: DX12 queue->GetDevice failed"); }
                 }
-                command_queue->Release();
             }
 #endif
         }
@@ -846,6 +933,7 @@ void StarOverlay::init_imgui_dx12(IDXGISwapChain* chain, void* device, void* com
     DXGI_SWAP_CHAIN_DESC sd{};
     chain->GetDesc(&sd);
     hwnd_ = sd.OutputWindow;
+    STAR_LOG("init_imgui_dx12: buffers=%u fmt=%u hwnd=%p", sd.BufferCount, sd.BufferDesc.Format, hwnd_);
 
     D3D12_DESCRIPTOR_HEAP_DESC rtv_desc = {};
     rtv_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -853,15 +941,16 @@ void StarOverlay::init_imgui_dx12(IDXGISwapChain* chain, void* device, void* com
     rtv_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
     ID3D12DescriptorHeap* rtv_heap = nullptr;
-    if (FAILED(dev->CreateDescriptorHeap(&rtv_desc, IID_PPV_ARGS(&rtv_heap)))) return;
+    if (FAILED(dev->CreateDescriptorHeap(&rtv_desc, IID_PPV_ARGS(&rtv_heap)))) { STAR_LOG("init_imgui_dx12: rtv_heap failed"); return; }
 
     D3D12_DESCRIPTOR_HEAP_DESC srv_desc = {};
     srv_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-    srv_desc.NumDescriptors = 1;
+    srv_desc.NumDescriptors = 257;
     srv_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     ID3D12DescriptorHeap* srv_heap = nullptr;
     if (FAILED(dev->CreateDescriptorHeap(&srv_desc, IID_PPV_ARGS(&srv_heap)))) {
+        STAR_LOG("init_imgui_dx12: srv_heap failed");
         rtv_heap->Release();
         return;
     }
@@ -879,17 +968,19 @@ void StarOverlay::init_imgui_dx12(IDXGISwapChain* chain, void* device, void* com
 
     std::vector<ID3D12CommandAllocator*> allocators(sd.BufferCount);
     for (UINT i = 0; i < sd.BufferCount; i++) {
-        if (FAILED(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocators[i])))) return;
+        if (FAILED(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocators[i])))) { STAR_LOG("init_imgui_dx12: allocator[%u] failed", i); return; }
     }
 
     ID3D12GraphicsCommandList* cmd_list = nullptr;
-    if (FAILED(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocators[0], nullptr, IID_PPV_ARGS(&cmd_list)))) return;
+    if (FAILED(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocators[0], nullptr, IID_PPV_ARGS(&cmd_list)))) { STAR_LOG("init_imgui_dx12: cmd_list failed"); return; }
     cmd_list->Close();
 
     ImGui::CreateContext();
     ImGui_ImplWin32_Init(hwnd_);
     hook_window();
 
+    IMGUI_CHECKVERSION();
+    STAR_LOG("init_imgui_dx12: calling ImGui_ImplDX12_Init");
     if (ImGui_ImplDX12_Init(dev, sd.BufferCount, sd.BufferDesc.Format, srv_heap,
                             srv_heap->GetCPUDescriptorHandleForHeapStart(),
                             srv_heap->GetGPUDescriptorHandleForHeapStart())) {
@@ -909,9 +1000,143 @@ void StarOverlay::init_imgui_dx12(IDXGISwapChain* chain, void* device, void* com
         dx12_resources_.resize(sd.BufferCount);
         for (UINT i = 0; i < sd.BufferCount; i++) dx12_resources_[i] = resources[i];
 
+        dx12_srv_next_slot_ = 1;
         imgui_initialized_ = true;
         active_api_ = GraphicsAPI::DX12;
+        STAR_LOG("ImGui ready (DX12)");
+    } else {
+        STAR_LOG("init_imgui_dx12: ImGui_ImplDX12_Init FAILED — BackendRendererUserData=%p",
+                 ImGui::GetIO().BackendRendererUserData);
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
     }
+}
+
+ImTextureID StarOverlay::upload_icon_dx12(const std::vector<uint8_t>& rgba, int w, int h)
+{
+    auto* dev   = (ID3D12Device*)dx12_device_;
+    auto* queue = (ID3D12CommandQueue*)dx12_command_queue_;
+    auto* heap  = (ID3D12DescriptorHeap*)dx12_srv_heap_;
+    if (!dev || !queue || !heap || dx12_srv_next_slot_ >= 257) return nullptr;
+
+    UINT row_pitch     = (UINT)(w * 4);
+    UINT aligned_pitch = (row_pitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
+                         & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1);
+    UINT64 upload_size = (UINT64)aligned_pitch * h;
+
+    D3D12_HEAP_PROPERTIES upload_props = {};
+    upload_props.Type = D3D12_HEAP_TYPE_UPLOAD;
+    D3D12_RESOURCE_DESC buf_desc = {};
+    buf_desc.Dimension  = D3D12_RESOURCE_DIMENSION_BUFFER;
+    buf_desc.Width      = upload_size;
+    buf_desc.Height     = buf_desc.DepthOrArraySize = buf_desc.MipLevels = 1;
+    buf_desc.Format     = DXGI_FORMAT_UNKNOWN;
+    buf_desc.SampleDesc.Count = 1;
+    buf_desc.Layout     = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+    ID3D12Resource* upload_buf = nullptr;
+    if (FAILED(dev->CreateCommittedResource(&upload_props, D3D12_HEAP_FLAG_NONE,
+                                            &buf_desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                            nullptr, IID_PPV_ARGS(&upload_buf))))
+        return nullptr;
+
+    void* mapped = nullptr;
+    if (FAILED(upload_buf->Map(0, nullptr, &mapped))) { upload_buf->Release(); return nullptr; }
+    for (int row = 0; row < h; row++)
+        memcpy((uint8_t*)mapped + (size_t)row * aligned_pitch, rgba.data() + (size_t)row * row_pitch, row_pitch);
+    upload_buf->Unmap(0, nullptr);
+
+    D3D12_HEAP_PROPERTIES default_props = {};
+    default_props.Type = D3D12_HEAP_TYPE_DEFAULT;
+    D3D12_RESOURCE_DESC tex_desc = {};
+    tex_desc.Dimension          = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    tex_desc.Width              = (UINT64)w;
+    tex_desc.Height             = (UINT)h;
+    tex_desc.DepthOrArraySize   = tex_desc.MipLevels = 1;
+    tex_desc.Format             = DXGI_FORMAT_R8G8B8A8_UNORM;
+    tex_desc.SampleDesc.Count   = 1;
+    tex_desc.Layout             = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    ID3D12Resource* texture = nullptr;
+    if (FAILED(dev->CreateCommittedResource(&default_props, D3D12_HEAP_FLAG_NONE,
+                                            &tex_desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                                            nullptr, IID_PPV_ARGS(&texture)))) {
+        upload_buf->Release(); return nullptr;
+    }
+
+    ID3D12CommandAllocator*    tmp_alloc = nullptr;
+    ID3D12GraphicsCommandList* tmp_list  = nullptr;
+    if (FAILED(dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tmp_alloc))) ||
+        FAILED(dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, tmp_alloc, nullptr, IID_PPV_ARGS(&tmp_list)))) {
+        if (tmp_alloc) tmp_alloc->Release();
+        texture->Release(); upload_buf->Release(); return nullptr;
+    }
+
+    D3D12_TEXTURE_COPY_LOCATION dst_loc = {};
+    dst_loc.pResource        = texture;
+    dst_loc.Type             = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    dst_loc.SubresourceIndex = 0;
+
+    D3D12_TEXTURE_COPY_LOCATION src_loc = {};
+    src_loc.pResource                            = upload_buf;
+    src_loc.Type                                 = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    src_loc.PlacedFootprint.Footprint.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
+    src_loc.PlacedFootprint.Footprint.Width      = (UINT)w;
+    src_loc.PlacedFootprint.Footprint.Height     = (UINT)h;
+    src_loc.PlacedFootprint.Footprint.Depth      = 1;
+    src_loc.PlacedFootprint.Footprint.RowPitch   = aligned_pitch;
+
+    tmp_list->CopyTextureRegion(&dst_loc, 0, 0, 0, &src_loc, nullptr);
+
+    D3D12_RESOURCE_BARRIER barrier = {};
+    barrier.Type                   = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource   = texture;
+    barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    barrier.Transition.StateAfter  = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    tmp_list->ResourceBarrier(1, &barrier);
+    tmp_list->Close();
+
+    ID3D12CommandList* lists[] = { tmp_list };
+    queue->ExecuteCommandLists(1, lists);
+
+    ID3D12Fence* fence = nullptr;
+    if (FAILED(dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)))) {
+        tmp_list->Release(); tmp_alloc->Release(); upload_buf->Release();
+        texture->Release(); return nullptr;
+    }
+    if (FAILED(queue->Signal(fence, 1))) {
+        fence->Release();
+        tmp_list->Release(); tmp_alloc->Release(); upload_buf->Release();
+        texture->Release(); return nullptr;
+    }
+    if (fence->GetCompletedValue() < 1) {
+        HANDLE ev = CreateEventA(nullptr, FALSE, FALSE, nullptr);
+        fence->SetEventOnCompletion(1, ev);
+        WaitForSingleObject(ev, INFINITE);
+        CloseHandle(ev);
+    }
+    fence->Release();
+    tmp_list->Release();
+    tmp_alloc->Release();
+    upload_buf->Release();
+
+    UINT desc_inc = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu = heap->GetCPUDescriptorHandleForHeapStart();
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu = heap->GetGPUDescriptorHandleForHeapStart();
+    cpu.ptr += (UINT64)dx12_srv_next_slot_ * desc_inc;
+    gpu.ptr += (UINT64)dx12_srv_next_slot_ * desc_inc;
+    dx12_srv_next_slot_++;
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+    srv_desc.Format                    = DXGI_FORMAT_R8G8B8A8_UNORM;
+    srv_desc.ViewDimension             = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srv_desc.Shader4ComponentMapping   = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srv_desc.Texture2D.MipLevels       = 1;
+    dev->CreateShaderResourceView(texture, &srv_desc, cpu);
+
+    dx12_icon_resources_.push_back(texture);
+    return (ImTextureID)(void*)(UINT64)gpu.ptr;
 }
 
 void StarOverlay::render_frame_dx12(IDXGISwapChain* chain)
@@ -986,6 +1211,10 @@ void StarOverlay::render_frame_dx12(IDXGISwapChain* chain)
 
 void StarOverlay::cleanup_dx12()
 {
+    for (auto* res : dx12_icon_resources_) if (res) ((ID3D12Resource*)res)->Release();
+    dx12_icon_resources_.clear();
+    dx12_srv_next_slot_ = 1;
+
     for (auto* res : dx12_resources_) if (res) ((ID3D12Resource*)res)->Release();
     dx12_resources_.clear();
     for (auto* alloc : dx12_command_allocators_) if (alloc) ((ID3D12CommandAllocator*)alloc)->Release();
@@ -1212,6 +1441,7 @@ void StarOverlay::on_present_opengl(HDC hdc)
     VK_FUNC(vkDestroyDevice) \
     VK_FUNC(vkEnumeratePhysicalDevices) \
     VK_FUNC(vkGetPhysicalDeviceQueueFamilyProperties) \
+    VK_FUNC(vkGetPhysicalDeviceMemoryProperties) \
     VK_FUNC(vkGetDeviceQueue) \
     VK_FUNC(vkCreateSwapchainKHR) \
     VK_FUNC(vkDestroySwapchainKHR) \
@@ -1228,10 +1458,29 @@ void StarOverlay::on_present_opengl(HDC hdc)
     VK_FUNC(vkEndCommandBuffer) \
     VK_FUNC(vkCmdBeginRenderPass) \
     VK_FUNC(vkCmdEndRenderPass) \
+    VK_FUNC(vkCmdPipelineBarrier) \
+    VK_FUNC(vkCmdCopyBufferToImage) \
     VK_FUNC(vkCreateFramebuffer) \
     VK_FUNC(vkDestroyFramebuffer) \
+    VK_FUNC(vkCreateImage) \
+    VK_FUNC(vkDestroyImage) \
     VK_FUNC(vkCreateImageView) \
     VK_FUNC(vkDestroyImageView) \
+    VK_FUNC(vkCreateBuffer) \
+    VK_FUNC(vkDestroyBuffer) \
+    VK_FUNC(vkAllocateMemory) \
+    VK_FUNC(vkFreeMemory) \
+    VK_FUNC(vkBindBufferMemory) \
+    VK_FUNC(vkBindImageMemory) \
+    VK_FUNC(vkMapMemory) \
+    VK_FUNC(vkUnmapMemory) \
+    VK_FUNC(vkGetBufferMemoryRequirements) \
+    VK_FUNC(vkGetImageMemoryRequirements) \
+    VK_FUNC(vkCreateSampler) \
+    VK_FUNC(vkDestroySampler) \
+    VK_FUNC(vkCreateFence) \
+    VK_FUNC(vkWaitForFences) \
+    VK_FUNC(vkDestroyFence) \
     VK_FUNC(vkQueuePresentKHR) \
     VK_FUNC(vkDeviceWaitIdle) \
     VK_FUNC(vkResetCommandBuffer) \
@@ -1261,6 +1510,15 @@ static PFN_vkVoidFunction ImGuiVulkanLoader(const char* function_name, void* use
     return (PFN_vkVoidFunction)GetProcAddress(vulkan, function_name);
 }
 
+static uint32_t vk_find_memory_type(VkPhysicalDevice pdev, uint32_t type_filter, VkMemoryPropertyFlags props) {
+    VkPhysicalDeviceMemoryProperties mem_props{};
+    vkGetPhysicalDeviceMemoryProperties(pdev, &mem_props);
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++)
+        if ((type_filter & (1u << i)) && (mem_props.memoryTypes[i].propertyFlags & props) == props)
+            return i;
+    return UINT32_MAX;
+}
+
 struct VulkanOverlayData {
     HMODULE vulkan_dll = nullptr;
     VkInstance instance = VK_NULL_HANDLE;
@@ -1275,10 +1533,22 @@ struct VulkanOverlayData {
     std::vector<VkFramebuffer> framebuffers;
     std::vector<VkImageView> image_views;
     uint32_t image_count = 0;
+    VkSampler icon_sampler = VK_NULL_HANDLE;
+    std::vector<VkImage>        icon_images;
+    std::vector<VkDeviceMemory> icon_memories;
+    std::vector<VkImageView>    icon_views;
 
     void cleanup() {
         if (device) {
             if (vkDeviceWaitIdle) vkDeviceWaitIdle(device);
+            for (auto v : icon_views)    if (v && vkDestroyImageView) vkDestroyImageView(device, v, nullptr);
+            icon_views.clear();
+            for (auto m : icon_memories) if (m && vkFreeMemory)       vkFreeMemory(device, m, nullptr);
+            icon_memories.clear();
+            for (auto i : icon_images)   if (i && vkDestroyImage)     vkDestroyImage(device, i, nullptr);
+            icon_images.clear();
+            if (icon_sampler && vkDestroySampler) vkDestroySampler(device, icon_sampler, nullptr);
+            icon_sampler = VK_NULL_HANDLE;
             for (auto fb : framebuffers) if (fb && vkDestroyFramebuffer) vkDestroyFramebuffer(device, fb, nullptr);
             framebuffers.clear();
             for (auto iv : image_views) if (iv && vkDestroyImageView) vkDestroyImageView(device, iv, nullptr);
@@ -1488,12 +1758,12 @@ void StarOverlay::init_imgui_vulkan(void* queue, const void* pPresentInfo)
     if (vkCreateRenderPass((VkDevice)vk_device_, &rp_info, nullptr, &rp) != VK_SUCCESS) return;
 
     VkDescriptorPoolSize pool_sizes[] = {
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 257 }
     };
     VkDescriptorPoolCreateInfo pool_info = {};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1;
+    pool_info.maxSets = 257;
     pool_info.poolSizeCount = 1;
     pool_info.pPoolSizes = pool_sizes;
 
@@ -1615,6 +1885,18 @@ void StarOverlay::init_imgui_vulkan(void* queue, const void* pPresentInfo)
         data->image_views = views;
         data->image_count = count;
 
+        VkSamplerCreateInfo samp_info = {};
+        samp_info.sType        = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        samp_info.magFilter    = VK_FILTER_LINEAR;
+        samp_info.minFilter    = VK_FILTER_LINEAR;
+        samp_info.mipmapMode   = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        samp_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samp_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samp_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samp_info.maxLod       = 1.f;
+        if (vkCreateSampler((VkDevice)vk_device_, &samp_info, nullptr, &data->icon_sampler) != VK_SUCCESS)
+            data->icon_sampler = VK_NULL_HANDLE;
+
         context_ = (ID3D11DeviceContext*)data;
     }
 }
@@ -1635,6 +1917,7 @@ void StarOverlay::render_frame_vulkan(void* queue, const void* pPresentInfo)
     };
     auto* pi = (const FakePresentInfo*)pPresentInfo;
     uint32_t image_index = pi->pImageIndices[0];
+    if (image_index >= data->image_count) return;
 
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplWin32_NewFrame();
@@ -1687,6 +1970,175 @@ void StarOverlay::render_frame_vulkan(void* queue, const void* pPresentInfo)
     if (vkQueueSubmit) {
         vkQueueSubmit((VkQueue)queue, 1, &submit, VK_NULL_HANDLE);
     }
+}
+
+ImTextureID StarOverlay::upload_icon_vulkan(const std::vector<uint8_t>& rgba, int w, int h)
+{
+    auto* data = (VulkanOverlayData*)context_;
+    if (!data || !data->device || !data->icon_sampler || !data->command_pool) return nullptr;
+
+    VkDevice dev  = data->device;
+    VkQueue  que  = data->queue;
+    VkCommandPool pool = data->command_pool;
+
+    VkBufferCreateInfo buf_info = {};
+    buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buf_info.size  = (VkDeviceSize)w * h * 4;
+    buf_info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkBuffer staging = VK_NULL_HANDLE;
+    if (vkCreateBuffer(dev, &buf_info, nullptr, &staging) != VK_SUCCESS) return nullptr;
+
+    VkMemoryRequirements buf_req{};
+    vkGetBufferMemoryRequirements(dev, staging, &buf_req);
+    uint32_t buf_mtype = vk_find_memory_type((VkPhysicalDevice)vk_physical_device_, buf_req.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    if (buf_mtype == UINT32_MAX) { vkDestroyBuffer(dev, staging, nullptr); return nullptr; }
+
+    VkMemoryAllocateInfo buf_alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    buf_alloc.allocationSize  = buf_req.size;
+    buf_alloc.memoryTypeIndex = buf_mtype;
+    VkDeviceMemory staging_mem = VK_NULL_HANDLE;
+    if (vkAllocateMemory(dev, &buf_alloc, nullptr, &staging_mem) != VK_SUCCESS) {
+        vkDestroyBuffer(dev, staging, nullptr); return nullptr;
+    }
+    vkBindBufferMemory(dev, staging, staging_mem, 0);
+
+    void* mapped = nullptr;
+    vkMapMemory(dev, staging_mem, 0, buf_req.size, 0, &mapped);
+    memcpy(mapped, rgba.data(), (size_t)w * h * 4);
+    vkUnmapMemory(dev, staging_mem);
+
+    VkImageCreateInfo img_info = {};
+    img_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    img_info.imageType     = VK_IMAGE_TYPE_2D;
+    img_info.format        = VK_FORMAT_R8G8B8A8_UNORM;
+    img_info.extent        = { (uint32_t)w, (uint32_t)h, 1 };
+    img_info.mipLevels     = 1;
+    img_info.arrayLayers   = 1;
+    img_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    img_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    img_info.usage         = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    img_info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    img_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkImage image = VK_NULL_HANDLE;
+    if (vkCreateImage(dev, &img_info, nullptr, &image) != VK_SUCCESS) {
+        vkFreeMemory(dev, staging_mem, nullptr); vkDestroyBuffer(dev, staging, nullptr); return nullptr;
+    }
+
+    VkMemoryRequirements img_req{};
+    vkGetImageMemoryRequirements(dev, image, &img_req);
+    uint32_t img_mtype = vk_find_memory_type((VkPhysicalDevice)vk_physical_device_, img_req.memoryTypeBits,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (img_mtype == UINT32_MAX) {
+        vkDestroyImage(dev, image, nullptr);
+        vkFreeMemory(dev, staging_mem, nullptr); vkDestroyBuffer(dev, staging, nullptr); return nullptr;
+    }
+    VkMemoryAllocateInfo img_alloc = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    img_alloc.allocationSize  = img_req.size;
+    img_alloc.memoryTypeIndex = img_mtype;
+    VkDeviceMemory img_mem = VK_NULL_HANDLE;
+    if (vkAllocateMemory(dev, &img_alloc, nullptr, &img_mem) != VK_SUCCESS) {
+        vkDestroyImage(dev, image, nullptr);
+        vkFreeMemory(dev, staging_mem, nullptr);
+        vkDestroyBuffer(dev, staging, nullptr);
+        return nullptr;
+    }
+    vkBindImageMemory(dev, image, img_mem, 0);
+
+    VkCommandBufferAllocateInfo cb_alloc = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    cb_alloc.commandPool        = pool;
+    cb_alloc.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cb_alloc.commandBufferCount = 1;
+    VkCommandBuffer cb = VK_NULL_HANDLE;
+    if (vkAllocateCommandBuffers(dev, &cb_alloc, &cb) != VK_SUCCESS) {
+        vkFreeMemory(dev, img_mem, nullptr);
+        vkDestroyImage(dev, image, nullptr);
+        vkFreeMemory(dev, staging_mem, nullptr);
+        vkDestroyBuffer(dev, staging, nullptr);
+        return nullptr;
+    }
+
+    VkCommandBufferBeginInfo begin = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cb, &begin);
+
+    auto transition = [&](VkImageLayout from, VkImageLayout to,
+                          VkPipelineStageFlags src_stage, VkPipelineStageFlags dst_stage,
+                          VkAccessFlags src_access, VkAccessFlags dst_access) {
+        VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        barrier.oldLayout           = from;
+        barrier.newLayout           = to;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image               = image;
+        barrier.subresourceRange    = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+        barrier.srcAccessMask       = src_access;
+        barrier.dstAccessMask       = dst_access;
+        vkCmdPipelineBarrier(cb, src_stage, dst_stage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    };
+
+    transition(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+               0, VK_ACCESS_TRANSFER_WRITE_BIT);
+
+    VkBufferImageCopy copy = {};
+    copy.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    copy.imageExtent      = { (uint32_t)w, (uint32_t)h, 1 };
+    vkCmdCopyBufferToImage(cb, staging, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+    transition(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+               VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+               VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
+
+    vkEndCommandBuffer(cb);
+
+    VkFenceCreateInfo fence_info = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+    VkFence fence = VK_NULL_HANDLE;
+    if (vkCreateFence(dev, &fence_info, nullptr, &fence) != VK_SUCCESS) {
+        vkFreeCommandBuffers(dev, pool, 1, &cb);
+        vkFreeMemory(dev, img_mem, nullptr);
+        vkDestroyImage(dev, image, nullptr);
+        vkFreeMemory(dev, staging_mem, nullptr);
+        vkDestroyBuffer(dev, staging, nullptr);
+        return nullptr;
+    }
+
+    VkSubmitInfo submit = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers    = &cb;
+    if (vkQueueSubmit(que, 1, &submit, fence) != VK_SUCCESS) {
+        vkDestroyFence(dev, fence, nullptr);
+        vkFreeCommandBuffers(dev, pool, 1, &cb);
+        vkFreeMemory(dev, img_mem, nullptr);
+        vkDestroyImage(dev, image, nullptr);
+        vkFreeMemory(dev, staging_mem, nullptr);
+        vkDestroyBuffer(dev, staging, nullptr);
+        return nullptr;
+    }
+    vkWaitForFences(dev, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkDestroyFence(dev, fence, nullptr);
+    vkFreeCommandBuffers(dev, pool, 1, &cb);
+    vkFreeMemory(dev, staging_mem, nullptr);
+    vkDestroyBuffer(dev, staging, nullptr);
+
+    VkImageViewCreateInfo view_info = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    view_info.image            = image;
+    view_info.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format           = VK_FORMAT_R8G8B8A8_UNORM;
+    view_info.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    VkImageView view = VK_NULL_HANDLE;
+    if (vkCreateImageView(dev, &view_info, nullptr, &view) != VK_SUCCESS) {
+        vkFreeMemory(dev, img_mem, nullptr);
+        vkDestroyImage(dev, image, nullptr);
+        return nullptr;
+    }
+
+    data->icon_images.push_back(image);
+    data->icon_memories.push_back(img_mem);
+    data->icon_views.push_back(view);
+
+    return ImGui_ImplVulkan_AddTexture(data->icon_sampler, view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void StarOverlay::cleanup_vulkan()

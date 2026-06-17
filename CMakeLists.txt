@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # ---- FetchContent for third-party libraries ----
@@ -141,6 +141,7 @@ target_link_libraries(star PRIVATE
     minhook_lib
     nlohmann_json::nlohmann_json
     d3d11
+    d3d12
     dxgi
     d3dcompiler
     d3d9
@@ -160,7 +161,7 @@ endif()
 # DEF file for clean exports (no LIBRARY line → no LNK4070 mismatch on x64)
 # /NODEFAULTLIB:LIBCMT silences LNK4098 from the static-CRT deps (minhook/imgui)
 set_target_properties(star PROPERTIES
-    LINK_FLAGS "/SUBSYSTEM:WINDOWS /DEF:${CMAKE_SOURCE_DIR}/steam_api.def /NODEFAULTLIB:LIBCMT"
+    LINK_FLAGS "/SUBSYSTEM:WINDOWS /DEF:${CMAKE_SOURCE_DIR}/steam_api.def"
 )
 
 if(MSVC)

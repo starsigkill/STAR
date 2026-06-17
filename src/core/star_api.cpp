@@ -219,7 +219,6 @@ STAR_EXPORT ESteamAPIInitResult SteamInternal_SteamAPI_Init(const char* pszInter
 STAR_EXPORT void SteamAPI_Shutdown()
 {
     if (!g_initialized) return;
-    StarOverlay::get().shutdown();
     g_initialized = false;
     STAR_LOG("SteamAPI_Shutdown");
 }
