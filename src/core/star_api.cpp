@@ -122,14 +122,13 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
     case DLL_PROCESS_ATTACH:
         g_dll_module = hModule;
         DisableThreadLibraryCalls(hModule);
-        CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         STAR_LOG("STAR loaded");
         break;
     case DLL_PROCESS_DETACH:
-
         if (lpReserved == nullptr && g_initialized) {
             StarOverlay::get().shutdown();
             CoUninitialize();
+            g_initialized = false;
         }
         break;
     }
@@ -139,6 +138,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 static bool star_init_internal()
 {
     if (g_initialized) return true;
+
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
     g_dll_dir = get_dll_dir();
     std::string settings_dir = find_settings_dir();
@@ -219,6 +220,8 @@ STAR_EXPORT ESteamAPIInitResult SteamInternal_SteamAPI_Init(const char* pszInter
 STAR_EXPORT void SteamAPI_Shutdown()
 {
     if (!g_initialized) return;
+    StarOverlay::get().shutdown();
+    CoUninitialize();
     g_initialized = false;
     STAR_LOG("SteamAPI_Shutdown");
 }
@@ -557,98 +560,117 @@ STAR_EXPORT ISteamNetworking* SteamGameServerNetworking()
 #pragma warning(disable: 4190)
 STAR_EXPORT CSteamID SteamAPI_ISteamUser_GetSteamID(ISteamUser* self)
 {
-    return self ? self->GetSteamID() : k_steamIDNil;
+    STAR_LOG("SteamAPI_ISteamUser_GetSteamID(self=%p)", self);
+    return StarSteamUser::get().GetSteamID();
 }
 #pragma warning(pop)
 
 STAR_EXPORT bool SteamAPI_ISteamUser_BLoggedOn(ISteamUser* self)
 {
-    return self ? self->BLoggedOn() : false;
+    STAR_LOG("SteamAPI_ISteamUser_BLoggedOn(self=%p)", self);
+    return StarSteamUser::get().BLoggedOn();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_RequestCurrentStats(ISteamUserStats* self)
 {
-    return self ? static_cast<StarSteamUserStats*>(self)->RequestCurrentStats() : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_RequestCurrentStats(self=%p)", self);
+    return StarSteamUserStats::get().RequestCurrentStats();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_GetAchievement(ISteamUserStats* self, const char* pchName, bool* pbAchieved)
 {
-    return self ? self->GetAchievement(pchName, pbAchieved) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_GetAchievement(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().GetAchievement(pchName, pbAchieved);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_SetAchievement(ISteamUserStats* self, const char* pchName)
 {
-    return self ? self->SetAchievement(pchName) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_SetAchievement(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().SetAchievement(pchName);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_ClearAchievement(ISteamUserStats* self, const char* pchName)
 {
-    return self ? self->ClearAchievement(pchName) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_ClearAchievement(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().ClearAchievement(pchName);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_StoreStats(ISteamUserStats* self)
 {
-    return self ? self->StoreStats() : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_StoreStats(self=%p)", self);
+    return StarSteamUserStats::get().StoreStats();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_GetStatInt32(ISteamUserStats* self, const char* pchName, int32* pData)
 {
-    return self ? self->GetStat(pchName, pData) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_GetStatInt32(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().GetStat(pchName, pData);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_GetStatFloat(ISteamUserStats* self, const char* pchName, float* pData)
 {
-    return self ? self->GetStat(pchName, pData) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_GetStatFloat(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().GetStat(pchName, pData);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_SetStatInt32(ISteamUserStats* self, const char* pchName, int32 nData)
 {
-    return self ? self->SetStat(pchName, nData) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_SetStatInt32(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().SetStat(pchName, nData);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamUserStats_SetStatFloat(ISteamUserStats* self, const char* pchName, float fData)
 {
-    return self ? self->SetStat(pchName, fData) : false;
+    STAR_LOG("SteamAPI_ISteamUserStats_SetStatFloat(self=%p, name=%s)", self, pchName ? pchName : "null");
+    return StarSteamUserStats::get().SetStat(pchName, fData);
 }
 
 STAR_EXPORT uint32 SteamAPI_ISteamUtils_GetAppID(ISteamUtils* self)
 {
-    return self ? self->GetAppID() : 0;
+    STAR_LOG("SteamAPI_ISteamUtils_GetAppID(self=%p)", self);
+    return StarSteamUtils::get().GetAppID();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamApps_BIsSubscribed(ISteamApps* self)
 {
-    return self ? self->BIsSubscribed() : false;
+    STAR_LOG("SteamAPI_ISteamApps_BIsSubscribed(self=%p)", self);
+    return StarSteamApps::get().BIsSubscribed();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamApps_BIsDlcInstalled(ISteamApps* self, AppId_t appID)
 {
-    return self ? self->BIsDlcInstalled(appID) : false;
+    STAR_LOG("SteamAPI_ISteamApps_BIsDlcInstalled(self=%p, dlc=%u)", self, appID);
+    return StarSteamApps::get().BIsDlcInstalled(appID);
 }
 
 STAR_EXPORT const char* SteamAPI_ISteamApps_GetCurrentGameLanguage(ISteamApps* self)
 {
-    return self ? self->GetCurrentGameLanguage() : "english";
+    STAR_LOG("SteamAPI_ISteamApps_GetCurrentGameLanguage(self=%p)", self);
+    return StarSteamApps::get().GetCurrentGameLanguage();
 }
 
 STAR_EXPORT const char* SteamAPI_ISteamFriends_GetPersonaName(ISteamFriends* self)
 {
-    return self ? self->GetPersonaName() : "";
+    STAR_LOG("SteamAPI_ISteamFriends_GetPersonaName(self=%p)", self);
+    return StarSteamFriends::get().GetPersonaName();
 }
 
 STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_FileWrite(ISteamRemoteStorage* self, const char* pchFile, const void* pvData, int32 cubData)
 {
-    return self ? self->FileWrite(pchFile, pvData, cubData) : false;
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_FileWrite(self=%p, file=%s)", self, pchFile ? pchFile : "null");
+    return StarSteamRemoteStorage::get().FileWrite(pchFile, pvData, cubData);
 }
 
 STAR_EXPORT int32 SteamAPI_ISteamRemoteStorage_FileRead(ISteamRemoteStorage* self, const char* pchFile, void* pvData, int32 cubDataToRead)
 {
-    return self ? self->FileRead(pchFile, pvData, cubDataToRead) : 0;
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_FileRead(self=%p, file=%s)", self, pchFile ? pchFile : "null");
+    return StarSteamRemoteStorage::get().FileRead(pchFile, pvData, cubDataToRead);
 }
 
 STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_FileExists(ISteamRemoteStorage* self, const char* pchFile)
 {
-    return self ? self->FileExists(pchFile) : false;
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_FileExists(self=%p, file=%s)", self, pchFile ? pchFile : "null");
+    return StarSteamRemoteStorage::get().FileExists(pchFile);
 }
 
 STAR_EXPORT bool SteamGameServer_Init(uint32 unIP, uint16 usSteamPort, uint16 usGamePort, uint16 usQueryPort, EServerMode eServerMode, const char* pchVersionString)

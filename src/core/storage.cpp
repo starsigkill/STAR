@@ -22,14 +22,29 @@ void Storage::init(uint32_t app_id, uint64_t steam_id)
     STAR_LOG("Storage initialized at: %s", base_path_.c_str());
 }
 
+static bool create_dir_recursive(const std::string& path)
+{
+    if (path.empty()) return false;
+    
+    DWORD attr = GetFileAttributesA(path.c_str());
+    if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) {
+        return true;
+    }
+
+    size_t last_slash = path.find_last_of("\\/");
+    if (last_slash != std::string::npos) {
+        std::string parent = path.substr(0, last_slash);
+        if (!parent.empty() && parent.back() != ':') {
+            if (!create_dir_recursive(parent)) return false;
+        }
+    }
+
+    return CreateDirectoryA(path.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
 bool Storage::ensure_dir(const std::string& path)
 {
-    try {
-        std::filesystem::create_directories(path);
-        return true;
-    } catch (...) {
-        return false;
-    }
+    return create_dir_recursive(path);
 }
 
 bool Storage::write_json(const std::string& path, const nlohmann::json& data)
@@ -108,33 +123,42 @@ bool Storage::read_remote_file(const std::string& filename, std::vector<uint8_t>
 bool Storage::remote_file_exists(const std::string& filename)
 {
     std::string path = remote_path(filename);
-    return std::filesystem::exists(path);
+    DWORD attr = GetFileAttributesA(path.c_str());
+    return (attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY));
 }
 
 bool Storage::delete_remote_file(const std::string& filename)
 {
     std::string path = remote_path(filename);
-    std::error_code ec;
-    return std::filesystem::remove(path, ec);
+    return DeleteFileA(path.c_str()) != 0;
 }
 
 std::vector<std::string> Storage::list_remote_files()
 {
     std::vector<std::string> files;
-    std::error_code ec;
-    for (auto& entry : std::filesystem::directory_iterator(remote_dir_, ec)) {
-        if (entry.is_regular_file()) {
-            files.push_back(entry.path().filename().string());
-        }
-    }
+    std::string search_path = remote_dir_ + "\\*";
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path.c_str(), &find_data);
+    if (hFind == INVALID_HANDLE_VALUE) return files;
+
+    do {
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        files.push_back(find_data.cFileName);
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
     return files;
 }
 
 int64_t Storage::remote_file_size(const std::string& filename)
 {
     std::string path = remote_path(filename);
-    std::error_code ec;
-    auto sz = std::filesystem::file_size(path, ec);
-    if (ec) return -1;
-    return (int64_t)sz;
+    WIN32_FILE_ATTRIBUTE_DATA fad;
+    if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fad)) {
+        LARGE_INTEGER size;
+        size.HighPart = fad.nFileSizeHigh;
+        size.LowPart = fad.nFileSizeLow;
+        return size.QuadPart;
+    }
+    return -1;
 }

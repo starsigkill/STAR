@@ -3,6 +3,7 @@
 #include "core/callbacks.h"
 #include "core/settings.h"
 #include "steam/isteamremotestorage.h"
+#include <time.h>
 
 StarSteamRemoteStorage& StarSteamRemoteStorage::get()
 {
@@ -157,14 +158,27 @@ int64 StarSteamRemoteStorage::GetFileTimestamp(const char* pchFile)
 {
     if (!pchFile) return 0;
     std::string path = Storage::get().remote_path(pchFile);
-    try {
-        auto ftime = std::filesystem::last_write_time(path);
+    HANDLE hFile = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE) return 0;
 
-        auto sys = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            ftime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now()
-        );
-        return (int64)std::chrono::system_clock::to_time_t(sys);
-    } catch (...) { return 0; }
+    FILETIME ftWrite;
+    if (GetFileTime(hFile, nullptr, nullptr, &ftWrite)) {
+        CloseHandle(hFile);
+        SYSTEMTIME stUTC;
+        FileTimeToSystemTime(&ftWrite, &stUTC);
+        
+        struct tm t = {};
+        t.tm_sec = stUTC.wSecond;
+        t.tm_min = stUTC.wMinute;
+        t.tm_hour = stUTC.wHour;
+        t.tm_mday = stUTC.wDay;
+        t.tm_mon = stUTC.wMonth - 1;
+        t.tm_year = stUTC.wYear - 1900;
+        t.tm_isdst = -1;
+        return (int64)_mkgmtime(&t);
+    }
+    CloseHandle(hFile);
+    return 0;
 }
 
 ERemoteStoragePlatform StarSteamRemoteStorage::GetSyncPlatforms(const char* pchFile)

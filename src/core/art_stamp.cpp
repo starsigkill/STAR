@@ -1,5 +1,5 @@
 #include "core/art_stamp.h"
-#include <filesystem>
+#include <windows.h>
 #include <fstream>
 #include <string>
 
@@ -20,12 +20,16 @@ static const char* k_sentinel = "; STAR-ART";
 
 void stamp_star_configs(const std::string& dir)
 {
-    namespace fs = std::filesystem;
-    std::error_code ec;
-    for (auto& entry : fs::directory_iterator(dir, ec)) {
-        if (entry.path().extension() != ".star") continue;
+    std::string search_path = dir + "\\*.star";
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path.c_str(), &find_data);
+    if (hFind == INVALID_HANDLE_VALUE) return;
 
-        std::ifstream in(entry.path());
+    do {
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+
+        std::string file_path = dir + "\\" + find_data.cFileName;
+        std::ifstream in(file_path);
         if (!in.is_open()) continue;
 
         std::string first_line;
@@ -36,8 +40,14 @@ void stamp_star_configs(const std::string& dir)
         std::string buf((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         in.close();
 
-        std::ofstream out(entry.path(), std::ios::trunc);
-        if (!out.is_open()) continue;
+        std::ofstream out(file_path, std::ios::trunc);
+        if (!out.is_open()) {
+            STAR_LOG("stamp_star_configs: failed to open for write: %s", file_path.c_str());
+            continue;
+        }
         out << k_sentinel << "\n" << k_art << "\n" << rest << buf;
-    }
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
 }
+

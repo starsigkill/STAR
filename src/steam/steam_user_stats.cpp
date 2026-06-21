@@ -6,7 +6,6 @@
 #include "overlay/overlay.h"
 #include "steam/isteamuserstats.h"
 #include <thread>
-#include <filesystem>
 #include <mmsystem.h>
 
 StarSteamUserStats& StarSteamUserStats::get()
@@ -186,7 +185,8 @@ bool StarSteamUserStats::SetAchievement(const char* pchName)
 static void play_achievement_sound()
 {
     std::string sound_path = Settings::get().settings_dir + "\\Sounds\\achievement.mp3";
-    if (!std::filesystem::exists(sound_path)) return;
+    DWORD attr = GetFileAttributesA(sound_path.c_str());
+    if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY)) return;
 
     std::thread([sound_path]() {
         std::string open_cmd = "open \"" + sound_path + "\" type mpegvideo alias star_ach";

@@ -30,8 +30,18 @@ void Settings::load(const std::string& dir)
     }
 
     if (app_id == 0) {
-        std::filesystem::path parent = std::filesystem::path(dir).parent_path();
-        std::string appid_path = parent.string() + "\\steam_appid.txt";
+        std::string stripped = dir;
+        while (!stripped.empty() && (stripped.back() == '\\' || stripped.back() == '/'))
+            stripped.pop_back();
+
+        std::string parent;
+        size_t last_slash = stripped.find_last_of("\\/");
+        if (last_slash != std::string::npos) {
+            parent = stripped.substr(0, last_slash);
+        } else {
+            parent = stripped;
+        }
+        std::string appid_path = parent + "\\steam_appid.txt";
         std::ifstream f(appid_path);
         if (f.is_open()) {
             std::string s;

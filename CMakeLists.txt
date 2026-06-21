@@ -166,7 +166,7 @@ set_target_properties(star PROPERTIES
 
 if(MSVC)
     target_compile_options(star PRIVATE /W3 /MP)
-    target_link_options(star PRIVATE $<$<CONFIG:Debug>:/MAP>)
+    target_link_options(star PRIVATE /MAP)
     # Debug info in release for debugging if needed
     target_compile_options(star PRIVATE $<$<CONFIG:Release>:/Zi>)
 endif()
