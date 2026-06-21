@@ -438,17 +438,17 @@ STAR_EXPORT ISteamClient* SteamClient()
 
 STAR_EXPORT ISteamUser* SteamUser()
 {
-    return static_cast<ISteamUser*>(&StarSteamUser::get());
+    return reinterpret_cast<ISteamUser*>(static_cast<ISteamUser017*>(&StarSteamUser::get()));
 }
 
 STAR_EXPORT ISteamFriends* SteamFriends()
 {
-    return static_cast<ISteamFriends*>(&StarSteamFriends::get());
+    return reinterpret_cast<ISteamFriends*>(static_cast<ISteamFriends014*>(&StarSteamFriends::get()));
 }
 
 STAR_EXPORT ISteamUtils* SteamUtils()
 {
-    return static_cast<ISteamUtils*>(&StarSteamUtils::get());
+    return reinterpret_cast<ISteamUtils*>(static_cast<ISteamUtils006*>(&StarSteamUtils::get()));
 }
 
 STAR_EXPORT ISteamMatchmaking* SteamMatchmaking()
@@ -463,12 +463,12 @@ STAR_EXPORT ISteamMatchmakingServers* SteamMatchmakingServers()
 
 STAR_EXPORT ISteamUserStats* SteamUserStats()
 {
-    return static_cast<ISteamUserStats*>(&StarSteamUserStats::get());
+    return reinterpret_cast<ISteamUserStats*>(static_cast<ISteamUserStats011*>(&StarSteamUserStats::get()));
 }
 
 STAR_EXPORT ISteamApps* SteamApps()
 {
-    return static_cast<ISteamApps*>(&StarSteamApps::get());
+    return reinterpret_cast<ISteamApps*>(static_cast<ISteamApps006*>(&StarSteamApps::get()));
 }
 
 STAR_EXPORT ISteamNetworking* SteamNetworking()
@@ -478,7 +478,7 @@ STAR_EXPORT ISteamNetworking* SteamNetworking()
 
 STAR_EXPORT ISteamRemoteStorage* SteamRemoteStorage()
 {
-    return static_cast<ISteamRemoteStorage*>(&StarSteamRemoteStorage::get());
+    return reinterpret_cast<ISteamRemoteStorage*>(static_cast<ISteamRemoteStorage012*>(&StarSteamRemoteStorage::get()));
 }
 
 STAR_EXPORT ISteamScreenshots* SteamScreenshots()
@@ -1135,29 +1135,29 @@ STAR_EXPORT ESteamAPIInitResult SteamInternal_GameServer_Init_V2(uint32 unIP, ui
     return k_ESteamAPIInitResult_OK;
 }
 
-STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v020() { return static_cast<ISteamUser*>(&StarSteamUser::get()); }
-STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v021() { return static_cast<ISteamUser*>(&StarSteamUser::get()); }
-STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v022() { return static_cast<ISteamUser*>(&StarSteamUser::get()); }
+STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v020() { return reinterpret_cast<ISteamUser*>(static_cast<ISteamUser020*>(&StarSteamUser::get())); }
+STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v021() { return reinterpret_cast<ISteamUser*>(static_cast<ISteamUser021*>(&StarSteamUser::get())); }
+STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v022() { return reinterpret_cast<ISteamUser*>(static_cast<ISteamUser022*>(&StarSteamUser::get())); }
 STAR_EXPORT ISteamUser* SteamAPI_SteamUser_v023() { return static_cast<ISteamUser*>(&StarSteamUser::get()); }
 
-STAR_EXPORT ISteamFriends* SteamAPI_SteamFriends_v017() { return &StarSteamFriends::get(); }
-STAR_EXPORT ISteamFriends* SteamAPI_SteamFriends_v018() { return &StarSteamFriends::get(); }
+STAR_EXPORT ISteamFriends* SteamAPI_SteamFriends_v017() { return reinterpret_cast<ISteamFriends*>(static_cast<ISteamFriends017*>(&StarSteamFriends::get())); }
+STAR_EXPORT ISteamFriends* SteamAPI_SteamFriends_v018() { return static_cast<ISteamFriends*>(&StarSteamFriends::get()); }
 
-STAR_EXPORT ISteamUtils* SteamAPI_SteamUtils_v009() { return &StarSteamUtils::get(); }
-STAR_EXPORT ISteamUtils* SteamAPI_SteamUtils_v010() { return &StarSteamUtils::get(); }
-STAR_EXPORT ISteamUtils* SteamAPI_SteamGameServerUtils_v009() { return &StarSteamUtils::get(); }
-STAR_EXPORT ISteamUtils* SteamAPI_SteamGameServerUtils_v010() { return &StarSteamUtils::get(); }
+STAR_EXPORT ISteamUtils* SteamAPI_SteamUtils_v009() { return reinterpret_cast<ISteamUtils*>(static_cast<ISteamUtils009*>(&StarSteamUtils::get())); }
+STAR_EXPORT ISteamUtils* SteamAPI_SteamUtils_v010() { return static_cast<ISteamUtils*>(&StarSteamUtils::get()); }
+STAR_EXPORT ISteamUtils* SteamAPI_SteamGameServerUtils_v009() { return reinterpret_cast<ISteamUtils*>(static_cast<ISteamUtils009*>(&StarSteamUtils::get())); }
+STAR_EXPORT ISteamUtils* SteamAPI_SteamGameServerUtils_v010() { return static_cast<ISteamUtils*>(&StarSteamUtils::get()); }
 
 STAR_EXPORT ISteamMatchmaking* SteamAPI_SteamMatchmaking_v009() { return &StarSteamMatchmaking::get(); }
 STAR_EXPORT ISteamMatchmakingServers* SteamAPI_SteamMatchmakingServers_v002() { return &StarSteamMatchmakingServers::get(); }
 
-STAR_EXPORT ISteamUserStats* SteamAPI_SteamUserStats_v011() { return static_cast<ISteamUserStats*>(&StarSteamUserStats::get()); }
-STAR_EXPORT ISteamUserStats* SteamAPI_SteamUserStats_v012() { return static_cast<ISteamUserStats*>(&StarSteamUserStats::get()); }
+STAR_EXPORT ISteamUserStats* SteamAPI_SteamUserStats_v011() { return reinterpret_cast<ISteamUserStats*>(static_cast<ISteamUserStats011*>(&StarSteamUserStats::get())); }
+STAR_EXPORT ISteamUserStats* SteamAPI_SteamUserStats_v012() { return reinterpret_cast<ISteamUserStats*>(static_cast<ISteamUserStats012*>(&StarSteamUserStats::get())); }
 STAR_EXPORT ISteamUserStats* SteamAPI_SteamUserStats_v013() { return static_cast<ISteamUserStats*>(&StarSteamUserStats::get()); }
 
-STAR_EXPORT ISteamApps* SteamAPI_SteamApps_v008() { return static_cast<ISteamApps*>(&StarSteamApps::get()); }
+STAR_EXPORT ISteamApps* SteamAPI_SteamApps_v008() { return reinterpret_cast<ISteamApps*>(static_cast<ISteamApps008*>(&StarSteamApps::get())); }
 STAR_EXPORT ISteamApps* SteamAPI_SteamApps_v009() { return static_cast<ISteamApps*>(&StarSteamApps::get()); }
-STAR_EXPORT ISteamApps* SteamAPI_SteamGameServerApps_v008() { return static_cast<ISteamApps*>(&StarSteamApps::get()); }
+STAR_EXPORT ISteamApps* SteamAPI_SteamGameServerApps_v008() { return reinterpret_cast<ISteamApps*>(static_cast<ISteamApps008*>(&StarSteamApps::get())); }
 STAR_EXPORT ISteamApps* SteamAPI_SteamGameServerApps_v009() { return static_cast<ISteamApps*>(&StarSteamApps::get()); }
 
 STAR_EXPORT ISteamNetworking* SteamAPI_SteamNetworking_v006() { return &StarSteamNetworking::get(); }

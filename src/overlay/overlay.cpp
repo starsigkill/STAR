@@ -115,6 +115,11 @@ void StarOverlay::init()
     if (hooks_installed_) return;
     if (MH_Initialize() != MH_OK) STAR_LOG("MinHook init failed");
 
+    WNDCLASSEXA wc{};
+    wc.cbSize = sizeof(wc); wc.lpfnWndProc = DefWindowProcA;
+    wc.hInstance = GetModuleHandleA(nullptr); wc.lpszClassName = "STAR_Dummy";
+    RegisterClassExA(&wc);
+
     HMODULE user32 = GetModuleHandleA("user32.dll");
     if (!user32) user32 = LoadLibraryA("user32.dll");
     if (user32) {

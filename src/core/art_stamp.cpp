@@ -1,4 +1,5 @@
 #include "core/art_stamp.h"
+#include "core/star_common.h"
 #include <windows.h>
 #include <fstream>
 #include <string>
