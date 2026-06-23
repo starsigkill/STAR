@@ -18,7 +18,7 @@ void Settings::load(const std::string& dir)
     {
 
         std::string appid_path = dir + "\\steam_appid.txt";
-        std::ifstream f(appid_path);
+        std::ifstream f(utf8_to_wstring(appid_path));
         if (f.is_open()) {
             std::string s;
             std::getline(f, s);
@@ -42,7 +42,7 @@ void Settings::load(const std::string& dir)
             parent = stripped;
         }
         std::string appid_path = parent + "\\steam_appid.txt";
-        std::ifstream f(appid_path);
+        std::ifstream f(utf8_to_wstring(appid_path));
         if (f.is_open()) {
             std::string s;
             std::getline(f, s);
@@ -140,7 +140,7 @@ void Settings::load(const std::string& dir)
 
     {
         std::string ach_path = dir + "\\achievements.json";
-        std::ifstream f(ach_path);
+        std::ifstream f(utf8_to_wstring(ach_path));
         if (f.is_open()) {
             try {
                 nlohmann::json j;

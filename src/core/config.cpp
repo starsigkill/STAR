@@ -17,7 +17,7 @@ std::string IniFile::to_lower(const std::string& s)
 
 bool IniFile::load(const std::string& path)
 {
-    std::ifstream f(path);
+    std::ifstream f(utf8_to_wstring(path));
     if (!f.is_open()) {
         return false;
     }

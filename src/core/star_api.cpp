@@ -71,11 +71,11 @@ struct SteamContextInitData {
 
 static std::string get_dll_dir()
 {
-    char path[MAX_PATH] = {};
-    GetModuleFileNameA(g_dll_module, path, MAX_PATH);
-    char* sep = strrchr(path, '\\');
+    wchar_t path[MAX_PATH] = {};
+    GetModuleFileNameW(g_dll_module, path, MAX_PATH);
+    wchar_t* sep = wcsrchr(path, L'\\');
     if (sep) *sep = 0;
-    return std::string(path);
+    return wstring_to_utf8(path);
 }
 
 static std::string find_settings_dir()
@@ -96,18 +96,18 @@ void STAR_WriteLog(const char* fmt, ...)
 
     OutputDebugStringA(out_buf);
 
-    static std::string log_path;
-    if (log_path.empty()) {
-        log_path = get_dll_dir() + "\\STAR\\star.log";
+    static std::wstring log_wpath;
+    if (log_wpath.empty()) {
+        log_wpath = utf8_to_wstring(get_dll_dir() + "\\STAR\\star.log");
     }
 
-    std::ofstream f(log_path, std::ios::app);
+    std::ofstream f(log_wpath, std::ios::app);
     if (f.is_open()) {
         f << out_buf;
     } else {
-        char temp_path[MAX_PATH];
-        if (GetTempPathA(MAX_PATH, temp_path) > 0) {
-            std::string fallback_path = std::string(temp_path) + "star.log";
+        wchar_t temp_path[MAX_PATH];
+        if (GetTempPathW(MAX_PATH, temp_path) > 0) {
+            std::wstring fallback_path = std::wstring(temp_path) + L"star.log";
             std::ofstream f_fallback(fallback_path, std::ios::app);
             if (f_fallback.is_open()) {
                 f_fallback << out_buf;
@@ -148,12 +148,12 @@ static bool star_init_internal()
     Settings::get().load(settings_dir);
 
     if (Settings::get().app_id == 0) {
-        char exe_path[MAX_PATH] = {};
-        GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
-        char* sep = strrchr(exe_path, '\\');
+        wchar_t exe_path[MAX_PATH] = {};
+        GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+        wchar_t* sep = wcsrchr(exe_path, L'\\');
         if (sep) {
             *sep = 0;
-            std::string app_id_path = std::string(exe_path) + "\\steam_appid.txt";
+            std::wstring app_id_path = std::wstring(exe_path) + L"\\steam_appid.txt";
             std::ifstream f(app_id_path);
             if (f.is_open()) {
                 std::string s;
