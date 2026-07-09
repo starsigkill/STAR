@@ -21,6 +21,8 @@ STAR/
 
 x64 game? Use `steam_api64.dll`. x86? Use `steam_api.dll`. Check the existing DLL name in the game folder if unsure.
 
+Game has anti-tamper and refuses to run with a modified DLL/exe? See `INTEGRITY.md` for the proxy loaders (`version.dll` / `baselib.dll`) and the `.bak` redirect setup.
+
 ---
 
 ## steam_appid.txt

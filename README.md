@@ -34,7 +34,7 @@ Drop the DLL next to the game executable. Create a `STAR/` folder there with you
 
 ```
 game.exe
-steam_api64.dll   ← this thing
+steam_api64.dll   <- this thing
 STAR/
   identity.star
   game.star

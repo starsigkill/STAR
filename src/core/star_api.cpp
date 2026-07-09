@@ -39,6 +39,7 @@
 #include "steam/steam_parties.h"
 #include "steam/steam_remote_play.h"
 #include "overlay/overlay.h"
+#include "core/integrity_hooks.h"
 
 #define STAR_EXPORT extern "C"
 
@@ -116,6 +117,12 @@ void STAR_WriteLog(const char* fmt, ...)
     }
 }
 
+static DWORD WINAPI STAR_EarlyHookThread(LPVOID)
+{
+    STAR_install_integrity_hooks();
+    return 0;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
     switch (ul_reason_for_call) {
@@ -123,12 +130,16 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
         g_dll_module = hModule;
         DisableThreadLibraryCalls(hModule);
         STAR_LOG("STAR loaded");
+        CloseHandle(CreateThread(NULL, 0, STAR_EarlyHookThread, NULL, 0, NULL));
         break;
     case DLL_PROCESS_DETACH:
         if (lpReserved == nullptr && g_initialized) {
             StarOverlay::get().shutdown();
             CoUninitialize();
             g_initialized = false;
+        }
+        if (lpReserved == nullptr) {
+            STAR_uninstall_integrity_hooks();
         }
         break;
     }
@@ -137,6 +148,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 
 static bool star_init_internal()
 {
+    STAR_install_integrity_hooks();
     if (g_initialized) return true;
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -240,6 +252,7 @@ STAR_EXPORT const char* SteamAPI_GetSteamInstallPath()
 STAR_EXPORT bool SteamAPI_RestartAppIfNecessary(uint32 unOwnAppID)
 {
     STAR_UNREFERENCED(unOwnAppID);
+    STAR_install_integrity_hooks();
     return false;
 }
 
@@ -631,6 +644,12 @@ STAR_EXPORT uint32 SteamAPI_ISteamUtils_GetAppID(ISteamUtils* self)
     return StarSteamUtils::get().GetAppID();
 }
 
+STAR_EXPORT const char* SteamAPI_ISteamUtils_GetIPCountry(ISteamUtils* self)
+{
+    STAR_LOG("SteamAPI_ISteamUtils_GetIPCountry(self=%p)", self);
+    return StarSteamUtils::get().GetIPCountry();
+}
+
 STAR_EXPORT bool SteamAPI_ISteamApps_BIsSubscribed(ISteamApps* self)
 {
     STAR_LOG("SteamAPI_ISteamApps_BIsSubscribed(self=%p)", self);
@@ -671,6 +690,60 @@ STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_FileExists(ISteamRemoteStorage* se
 {
     STAR_LOG("SteamAPI_ISteamRemoteStorage_FileExists(self=%p, file=%s)", self, pchFile ? pchFile : "null");
     return StarSteamRemoteStorage::get().FileExists(pchFile);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_FileDelete(ISteamRemoteStorage* self, const char* pchFile)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_FileDelete(self=%p, file=%s)", self, pchFile ? pchFile : "null");
+    return StarSteamRemoteStorage::get().FileDelete(pchFile);
+}
+
+STAR_EXPORT int32 SteamAPI_ISteamRemoteStorage_GetLocalFileChangeCount(ISteamRemoteStorage* self)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_GetLocalFileChangeCount(self=%p)", self);
+    return StarSteamRemoteStorage::get().GetLocalFileChangeCount();
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamRemoteStorage_GetLocalFileChange(ISteamRemoteStorage* self, int iFile, ERemoteStorageLocalFileChange* pEChangeType, ERemoteStorageFilePathType* pEFilePathType)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_GetLocalFileChange(self=%p, iFile=%d)", self, iFile);
+    return StarSteamRemoteStorage::get().GetLocalFileChange(iFile, pEChangeType, pEFilePathType);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_IsCloudEnabledForAccount(ISteamRemoteStorage* self)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_IsCloudEnabledForAccount(self=%p)", self);
+    return StarSteamRemoteStorage::get().IsCloudEnabledForAccount();
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_IsCloudEnabledForApp(ISteamRemoteStorage* self)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_IsCloudEnabledForApp(self=%p)", self);
+    return StarSteamRemoteStorage::get().IsCloudEnabledForApp();
+}
+
+STAR_EXPORT void SteamAPI_ISteamRemoteStorage_SetCloudEnabledForApp(ISteamRemoteStorage* self, bool bEnabled)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_SetCloudEnabledForApp(self=%p, enabled=%d)", self, bEnabled);
+    StarSteamRemoteStorage::get().SetCloudEnabledForApp(bEnabled);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_GetQuota(ISteamRemoteStorage* self, uint64* pnTotalBytes, uint64* puAvailableBytes)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_GetQuota(self=%p)", self);
+    return StarSteamRemoteStorage::get().GetQuota(pnTotalBytes, puAvailableBytes);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(ISteamRemoteStorage* self)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch(self=%p)", self);
+    return StarSteamRemoteStorage::get().BeginFileWriteBatch();
+}
+
+STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_EndFileWriteBatch(ISteamRemoteStorage* self)
+{
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_EndFileWriteBatch(self=%p)", self);
+    return StarSteamRemoteStorage::get().EndFileWriteBatch();
 }
 
 STAR_EXPORT bool SteamGameServer_Init(uint32 unIP, uint16 usSteamPort, uint16 usGamePort, uint16 usQueryPort, EServerMode eServerMode, const char* pchVersionString)
@@ -1049,12 +1122,15 @@ STAR_EXPORT bool SteamAPI_ISteamRemoteStorage_FileReadAsyncComplete(ISteamRemote
 
 STAR_EXPORT SteamAPICall_t SteamAPI_ISteamRemoteStorage_FileWriteAsync(ISteamRemoteStorage* self, const char* pchFile, const void* pvData, uint32 cubData)
 {
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_FileWriteAsync(self=%p, file=%s, size=%u)", self, pchFile ? pchFile : "null", cubData);
     return self ? self->FileWriteAsync(pchFile, pvData, cubData) : k_uAPICallInvalid;
 }
 
 STAR_EXPORT int32 SteamAPI_ISteamRemoteStorage_GetFileSize(ISteamRemoteStorage* self, const char* pchFile)
 {
-    return self ? self->GetFileSize(pchFile) : 0;
+    int32 size = self ? self->GetFileSize(pchFile) : 0;
+    STAR_LOG("SteamAPI_ISteamRemoteStorage_GetFileSize(self=%p, file=%s) -> %d", self, pchFile ? pchFile : "null", size);
+    return size;
 }
 
 STAR_EXPORT const char* SteamAPI_ISteamUserStats_GetAchievementName(ISteamUserStats* self, uint32 iAchievement)

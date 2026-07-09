@@ -81,6 +81,7 @@ set(STAR_SOURCES
     src/core/art_stamp.cpp
     src/core/callbacks.cpp
     src/core/config.cpp
+    src/core/integrity_hooks.cpp
     src/core/settings.cpp
     src/core/star_api.cpp
     src/core/storage.cpp
@@ -158,7 +159,7 @@ else()
     set_target_properties(star PROPERTIES OUTPUT_NAME "steam_api")
 endif()
 
-# DEF file for clean exports (no LIBRARY line → no LNK4070 mismatch on x64)
+# DEF file for clean exports (no LIBRARY line > no LNK4070 mismatch on x64)
 # /NODEFAULTLIB:LIBCMT silences LNK4098 from the static-CRT deps (minhook/imgui)
 set_target_properties(star PROPERTIES
     LINK_FLAGS "/SUBSYSTEM:WINDOWS /DEF:${CMAKE_SOURCE_DIR}/steam_api.def"
@@ -171,28 +172,12 @@ if(MSVC)
     target_compile_options(star PRIVATE $<$<CONFIG:Release>:/Zi>)
 endif()
 
-# ---- star_setup TUI (PyInstaller exe) ----------------------------------------
-option(BUILD_SETUP_TOOL "Build the star_setup TUI executable (requires Python & PyInstaller)" OFF)
+add_library(version_proxy SHARED src/proxy/version.cpp)
+set_target_properties(version_proxy PROPERTIES OUTPUT_NAME "version")
 
-if(BUILD_SETUP_TOOL)
-    find_program(PYTHON_EXECUTABLE NAMES python python3 REQUIRED)
-
-    add_custom_target(star_setup_exe ALL
-        COMMAND ${PYTHON_EXECUTABLE} -m PyInstaller
-                --onefile
-                --console
-                --name star_setup
-                --collect-all textual
-                --collect-all rich
-                --hidden-import PIL
-                --hidden-import PIL.Image
-                --distpath "${CMAKE_BINARY_DIR}/$<CONFIG>"
-                --workpath "${CMAKE_BINARY_DIR}/pyinstaller_work"
-                --noconfirm
-                "${CMAKE_SOURCE_DIR}/tools/star_setup.py"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tools"
-        COMMENT "Building star_setup.exe with PyInstaller"
-        VERBATIM
-    )
-endif()
+add_library(baselib_proxy SHARED src/proxy/baselib.cpp)
+set_target_properties(baselib_proxy PROPERTIES
+    OUTPUT_NAME "baselib"
+    LINK_FLAGS "/DEF:${CMAKE_SOURCE_DIR}/src/proxy/baselib.def"
+)
 

@@ -96,7 +96,7 @@ uint64_t STAR_PostCallResult(int cb_id, const void* data, size_t size, bool io_f
 
         QueuedManualCallback qmc;
         qmc.hSteamUser = 1;
-        qmc.iCallback = 503;
+        qmc.iCallback = 703;
         qmc.data.resize(sizeof(completed));
         memcpy(qmc.data.data(), &completed, sizeof(completed));
         g_manual_callback_queue.push_back(std::move(qmc));

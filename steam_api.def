@@ -1,4 +1,5 @@
 EXPORTS
+    STAR_install_integrity_hooks
     SteamAPI_Init
     SteamAPI_InitSafe
     SteamAPI_InitEx
@@ -67,6 +68,7 @@ EXPORTS
     SteamAPI_ISteamUserStats_SetStatInt32
     SteamAPI_ISteamUserStats_SetStatFloat
     SteamAPI_ISteamUtils_GetAppID
+    SteamAPI_ISteamUtils_GetIPCountry
     SteamAPI_ISteamApps_BIsSubscribed
     SteamAPI_ISteamApps_BIsDlcInstalled
     SteamAPI_ISteamApps_GetCurrentGameLanguage
@@ -74,6 +76,15 @@ EXPORTS
     SteamAPI_ISteamRemoteStorage_FileWrite
     SteamAPI_ISteamRemoteStorage_FileRead
     SteamAPI_ISteamRemoteStorage_FileExists
+    SteamAPI_ISteamRemoteStorage_FileDelete
+    SteamAPI_ISteamRemoteStorage_GetLocalFileChangeCount
+    SteamAPI_ISteamRemoteStorage_GetLocalFileChange
+    SteamAPI_ISteamRemoteStorage_IsCloudEnabledForAccount
+    SteamAPI_ISteamRemoteStorage_IsCloudEnabledForApp
+    SteamAPI_ISteamRemoteStorage_SetCloudEnabledForApp
+    SteamAPI_ISteamRemoteStorage_GetQuota
+    SteamAPI_ISteamRemoteStorage_BeginFileWriteBatch
+    SteamAPI_ISteamRemoteStorage_EndFileWriteBatch
     SteamAPI_ISteamClient_CreateSteamPipe
     SteamAPI_ISteamClient_BReleaseSteamPipe
     SteamAPI_ISteamClient_ConnectToGlobalUser

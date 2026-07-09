@@ -1010,7 +1010,7 @@ void StarOverlay::init_imgui_dx12(IDXGISwapChain* chain, void* device, void* com
         active_api_ = GraphicsAPI::DX12;
         STAR_LOG("ImGui ready (DX12)");
     } else {
-        STAR_LOG("init_imgui_dx12: ImGui_ImplDX12_Init FAILED — BackendRendererUserData=%p",
+        STAR_LOG("init_imgui_dx12: ImGui_ImplDX12_Init FAILED - BackendRendererUserData=%p",
                  ImGui::GetIO().BackendRendererUserData);
         ImGui_ImplWin32_Shutdown();
         ImGui::DestroyContext();
