@@ -32,7 +32,7 @@ The hooks only work if they're installed **before** the game runs its integrity 
 
 Sometimes STAR itself loads too late: a game that `LoadLibrary`s `steam_api64.dll` at runtime, *after* its startup integrity check has already run. In that case STAR's own `DllMain` fires too late to matter.
 
-The proxy loaders fix the timing by loading *earlier* than the game's check. They're DLLs the game pulls in at process init; on load each spins a thread that `LoadLibrary`s `steam_api64.dll` and calls `STAR_install_integrity_hooks`, then forwards all its real exports elsewhere so the game sees a normal, working DLL.
+The proxy loaders fix the timing by loading *earlier* than the game's check. They're DLLs the game pulls in at process init; on load each spins a thread that locates and `LoadLibrary`s `steam_api64.dll` (dynamically scanning subdirectories if it is not in the same folder) and calls `STAR_install_integrity_hooks`, then forwards all its real exports elsewhere so the game sees a normal, working DLL.
 
 `STAR_install_integrity_hooks` is idempotent, so it's fine that STAR *and* a proxy may both call it. Whoever gets there first wins; the rest are no-ops.
 
@@ -51,7 +51,8 @@ Start with `version.dll`. Only move to `baselib.dll` if the exe check still fire
 
 You only need **one** of them.
 
-> **64-bit only.** Both proxies load `steam_api64.dll` by name. 32-bit games aren't wired up - you'd need a 32-bit proxy build that loads `steam_api.dll`.
+> Both proxies load `steam_api64.dll` or `steam_api.dll` by name, dynamically scanning subdirectories if the target library isn't in the root directory. (Note: standard proxies are 64-bit; for 32-bit games you would compile a 32-bit proxy target that locates `steam_api.dll`).
+
 
 ---
 
@@ -96,14 +97,19 @@ Same idea, but Unity's `baselib.dll` is a real dependency with real exports, so 
 3. Drop your built `baselib.dll` in as `baselib.dll`.
 4. Lay down `.bak` backups exactly as with version.dll above.
 
-Layout (typically `GameName_Data/Plugins/x86_64/` or the game root, wherever the original `baselib.dll` lived):
+Layout (the proxy loader will dynamically search subfolders and locate `steam_api64.dll` automatically, so there is no need to copy it to the root folder if the game separates them):
 
 ```
-baselib.dll             <- proxy loader
-baselib_original.dll    <- the game's real baselib, renamed
-steam_api64.dll         <- STAR
-steam_api64.dll.bak     <- pristine original Steam DLL
+[Game Root Directory]
+├── baselib.dll             <- proxy loader
+├── baselib_original.dll    <- the game's real baselib, renamed
+└── (any other game files...)
+
+[Plugins Directory] (typically GameName_Data/Plugins/x86_64/)
+├── steam_api64.dll         <- STAR (emulator)
+└── steam_api64.dll.bak     <- pristine original Steam DLL
 ```
+
 
 ### the export list is version-specific - regenerate it
 
