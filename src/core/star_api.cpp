@@ -41,7 +41,9 @@
 #include "overlay/overlay.h"
 #include "core/integrity_hooks.h"
 
+#ifndef STAR_EXPORT
 #define STAR_EXPORT extern "C"
+#endif
 
 enum ESteamAPIInitResult {
     k_ESteamAPIInitResult_OK = 0,
@@ -578,14 +580,11 @@ STAR_EXPORT ISteamNetworking* SteamGameServerNetworking()
     return &StarSteamNetworking::get();
 }
 
-#pragma warning(push)
-#pragma warning(disable: 4190)
-STAR_EXPORT CSteamID SteamAPI_ISteamUser_GetSteamID(ISteamUser* self)
+STAR_EXPORT uint64_t SteamAPI_ISteamUser_GetSteamID(ISteamUser* self)
 {
     STAR_LOG("SteamAPI_ISteamUser_GetSteamID(self=%p)", self);
-    return StarSteamUser::get().GetSteamID();
+    return StarSteamUser::get().GetSteamID().ConvertToUint64();
 }
-#pragma warning(pop)
 
 STAR_EXPORT bool SteamAPI_ISteamUser_BLoggedOn(ISteamUser* self)
 {

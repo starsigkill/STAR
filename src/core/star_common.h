@@ -104,3 +104,11 @@ inline std::string wstring_to_utf8(const std::wstring& wstr)
     return strTo;
 }
 
+#ifndef STAR_EXPORT
+#define STAR_EXPORT extern "C"
+#endif
+
+#ifndef STEAMAPI_API
+#define STEAMAPI_API extern "C"
+#endif
+
