@@ -416,7 +416,7 @@ STAR_EXPORT void* SteamInternal_ContextInit(void* pContextInitData)
         void(*fn)(void*) = (void(*)(void*))data[0];
         data[1] = g_lifetime_counter;
         if (fn) {
-            fn(pContextInitData);
+            fn(local_ctx);
         }
     }
 

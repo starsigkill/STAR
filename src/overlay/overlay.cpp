@@ -13,6 +13,8 @@
 #include <d3d9.h>
 #include <d3d12.h>
 #include <vulkan/vulkan.h>
+#include <cctype>
+#include <algorithm>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -322,9 +324,9 @@ void StarOverlay::setup_imgui_style_and_fonts()
         return nullptr;
     };
 
-    font_small_ = tryFont(12.f);
-    font_title_ = tryFont(15.f);
-    if (ImFont* fb = tryFont(13.f)) io.FontDefault = fb;
+    font_small_ = tryFont(14.f);
+    font_title_ = tryFont(19.f);
+    if (ImFont* fb = tryFont(16.f)) io.FontDefault = fb;
     else io.Fonts->AddFontDefault();
 
     ImGui::StyleColorsDark();
@@ -337,10 +339,10 @@ void StarOverlay::setup_imgui_style_and_fonts()
     s.WindowBorderSize = 1.f;
     s.ChildBorderSize  = 0.f;
     s.FrameBorderSize  = 0.f;
-    s.WindowPadding    = { 14.f, 12.f };
-    s.FramePadding     = {  8.f,  5.f };
-    s.ItemSpacing      = {  8.f,  8.f };
-    s.ScrollbarSize    = 5.f;
+    s.WindowPadding    = { 18.f, 16.f };
+    s.FramePadding     = { 10.f,  7.f };
+    s.ItemSpacing      = { 10.f, 10.f };
+    s.ScrollbarSize    = 8.f;
 
     auto* C = s.Colors;
     C[ImGuiCol_WindowBg]           = v4(P_BG0, 0.97f);
@@ -489,8 +491,8 @@ void StarOverlay::render_notifications(float dt)
     ImFont* fsmall = (ImFont*)font_small_;
     ImFont* ftitle = (ImFont*)font_title_;
 
-    const float W   = 292.f;
-    const float H   = 68.f;
+    const float W   = 340.f;
+    const float H   = 82.f;
     const float PAD = 14.f;
     const float GAP =  8.f;
     const float SLIDE_DUR = 0.3f;
@@ -512,7 +514,7 @@ void StarOverlay::render_notifications(float dt)
 
         dl->AddRectFilled({x, y+3.f}, {x+3.f, y+H-3.f}, col(P_ACC, a), 2.f);
 
-        float ix = x + 11.f, iy = y + (H - 44.f) * .5f, is = 44.f;
+        float ix = x + 14.f, iy = y + (H - 52.f) * .5f, is = 52.f;
         ImTextureID notif_tex = get_or_create_icon(n.title, n.icon_rgba, n.icon_width, n.icon_height);
         if (notif_tex) {
             dl->AddImageRounded(notif_tex,
@@ -520,24 +522,25 @@ void StarOverlay::render_notifications(float dt)
         } else {
             dl->AddRectFilled({ix,iy},{ix+is,iy+is}, col(P_BG2, a), 4.f);
         }
+        dl->AddRect({ix-1.5f,iy-1.5f},{ix+is+1.5f,iy+is+1.5f}, col(P_ACC, a*0.6f), 5.f, 0, 1.5f);
 
-        float tx = ix + is + 10.f;
-        float tw = W - (tx - x) - 10.f;
+        float tx = ix + is + 12.f;
+        float tw = W - (tx - x) - 12.f;
 
-        float ly = y + 10.f;
-        dl->PushClipRect({tx,ly},{tx+tw,ly+14.f},true);
-        dl->AddText(fsmall, 11.f, {tx,ly}, col(P_ACC, a), "ACHIEVEMENT UNLOCKED");
+        float ly = y + 12.f;
+        dl->PushClipRect({tx,ly},{tx+tw,ly+16.f},true);
+        dl->AddText(fsmall, 12.f, {tx,ly}, col(P_ACC, a), "ACHIEVEMENT UNLOCKED");
         dl->PopClipRect();
 
-        float ty2 = ly + 15.f;
-        dl->PushClipRect({tx,ty2},{tx+tw,ty2+18.f},true);
-        dl->AddText(ftitle, 14.f, {tx,ty2}, col(P_TXT, a), n.title.c_str());
+        float ty2 = ly + 18.f;
+        dl->PushClipRect({tx,ty2},{tx+tw,ty2+22.f},true);
+        dl->AddText(ftitle, 17.f, {tx,ty2}, col(P_TXT, a), n.title.c_str());
         dl->PopClipRect();
 
         if (!n.description.empty()) {
-            float dy = ty2 + 19.f;
-            dl->PushClipRect({tx,dy},{tx+tw,dy+14.f},true);
-            dl->AddText(fsmall, 11.f, {tx,dy}, col(P_MUT, a), n.description.c_str());
+            float dy = ty2 + 23.f;
+            dl->PushClipRect({tx,dy},{tx+tw,dy+16.f},true);
+            dl->AddText(fsmall, 13.f, {tx,dy}, col(P_MUT, a), n.description.c_str());
             dl->PopClipRect();
         }
 
@@ -559,7 +562,7 @@ void StarOverlay::render_panel()
     float slide   = easeOut(panel_anim_);
     float alpha   = panel_anim_;
 
-    const float PW = 360.f;
+    const float PW = 420.f;
 
     ImGui::GetBackgroundDrawList()->AddRectFilled(
         {0,0}, {sw,sh}, col(0,0,0, 0.35f * alpha));
@@ -668,6 +671,31 @@ void StarOverlay::render_panel()
 
     ImGui::Spacing();
 
+    {
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, v4(P_BG1, 1.f));
+        ImGui::PushStyleColor(ImGuiCol_Text, v4(P_TXT, 1.f));
+        ImGui::SetNextItemWidth(-1.f);
+        ImGui::InputTextWithHint("##filter", "Search achievements...",
+            achievement_filter_, sizeof(achievement_filter_));
+        ImGui::PopStyleColor(2);
+
+        const char* tabs[3] = { "All", "Unlocked", "Locked" };
+        float avail = ImGui::GetContentRegionAvail().x;
+        float tab_w = (avail - 8.f) / 3.f;
+        for (int i = 0; i < 3; i++) {
+            if (i > 0) ImGui::SameLine(0.f, 4.f);
+            bool active = filter_mode_ == i;
+            ImGui::PushStyleColor(ImGuiCol_Button,        active ? v4(P_ACC, 0.22f) : v4(P_BG2, 1.f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? v4(P_ACC, 0.3f)  : v4(0x30,0x30,0x30, 1.f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  v4(P_ACC, 0.35f));
+            ImGui::PushStyleColor(ImGuiCol_Text,          active ? v4(P_ACC, 1.f) : v4(P_MUT, 1.f));
+            if (ImGui::Button(tabs[i], {tab_w, 30.f})) filter_mode_ = i;
+            ImGui::PopStyleColor(4);
+        }
+    }
+
+    ImGui::Spacing();
+
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.f, 0.f});
     ImGui::BeginChild("##ach", {0, 0}, false, 0);
     {
@@ -703,13 +731,26 @@ void StarOverlay::render_panel()
             scroll_current_y_ = scroll_target_y_;
         }
 
-    const float ROW_H  = 52.f;
-    const float ICON_S = 36.f;
+    const float ROW_H  = 64.f;
+    const float ICON_S = 44.f;
     const float ICON_X = 12.f;
 
+    std::string needle = achievement_filter_;
+    std::transform(needle.begin(), needle.end(), needle.begin(), ::tolower);
+
+    int shown = 0;
     for (auto& def : s.achievements) {
         bool got = false;
         stats.GetAchievement(def.name.c_str(), &got);
+
+        if (filter_mode_ == 1 && !got) continue;
+        if (filter_mode_ == 2 && got) continue;
+        if (!needle.empty()) {
+            std::string hay = (!def.display_name.empty()) ? def.display_name : def.name;
+            std::transform(hay.begin(), hay.end(), hay.begin(), ::tolower);
+            if (hay.find(needle) == std::string::npos) continue;
+        }
+        shown++;
 
         ImVec2 rmin = ImGui::GetCursorScreenPos();
         float  rw   = ImGui::GetContentRegionAvail().x;
@@ -754,43 +795,46 @@ void StarOverlay::render_panel()
             dl->AddRectFilled({ix2,iy2},{ix2+ICON_S,iy2+ICON_S},
                 col(P_BG2, 1.f), 3.f);
         }
+        if (got)
+            dl->AddRect({ix2-1.5f,iy2-1.5f},{ix2+ICON_S+1.5f,iy2+ICON_S+1.5f},
+                col(P_ACC, 0.6f), 4.f, 0, 1.5f);
 
         float dot_x = ix2 + ICON_S - 6.f, dot_y = iy2;
         dl->AddCircleFilled({dot_x, dot_y}, 5.f,
             got ? col(P_GRN, 1.f) : col(P_DIM, 0.f));
 
-        float tx  = ix2 + ICON_S + 10.f;
-        float ty0 = rmin.y + 10.f;
-        float tw  = rw - (tx - rmin.x) - 80.f;
+        float tx  = ix2 + ICON_S + 12.f;
+        float ty0 = rmin.y + 11.f;
+        float tw  = rw - (tx - rmin.x) - 92.f;
 
         const char* name = (!def.display_name.empty()) ? def.display_name.c_str() : def.name.c_str();
         if (def.hidden && !got) name = "(Hidden)";
 
         ImU32 name_col = got ? col(P_TXT, 1.f) : col(P_MUT, 1.f);
-        dl->PushClipRect({tx,ty0},{tx+tw,ty0+18.f},true);
-        dl->AddText(ftitle, 14.f, {tx,ty0}, name_col, name);
+        dl->PushClipRect({tx,ty0},{tx+tw,ty0+22.f},true);
+        dl->AddText(ftitle, 17.f, {tx,ty0}, name_col, name);
         dl->PopClipRect();
 
         const char* desc = (!def.description.empty()) ? def.description.c_str() : nullptr;
         if (desc && (!def.hidden || got)) {
-            float dy = ty0 + 19.f;
-            dl->PushClipRect({tx,dy},{tx+tw,dy+14.f},true);
-            dl->AddText(fsmall, 11.f, {tx,dy}, col(P_DIM, 1.f), desc);
+            float dy = ty0 + 23.f;
+            dl->PushClipRect({tx,dy},{tx+tw,dy+17.f},true);
+            dl->AddText(fsmall, 13.f, {tx,dy}, col(P_DIM, 1.f), desc);
             dl->PopClipRect();
         }
 
-        float btn_x = rmin.x + rw - 72.f;
-        float btn_y = rmin.y + (ROW_H - 22.f) * .5f;
+        float btn_x = rmin.x + rw - 84.f;
+        float btn_y = rmin.y + (ROW_H - 26.f) * .5f;
 
         ImGui::SetCursorScreenPos({btn_x, btn_y});
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {6.f, 3.f});
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {8.f, 4.f});
 
         if (got) {
             ImGui::PushStyleColor(ImGuiCol_Button,        v4(P_BG2,    1.f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(0x38,0x1a,0x1a, 1.f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  v4(0x44,0x20,0x20, 1.f));
             ImGui::PushStyleColor(ImGuiCol_Text,          v4(P_MUT, 1.f));
-            if (ImGui::Button(("Reset##" + def.name).c_str(), {62.f, 22.f}))
+            if (ImGui::Button(("Reset##" + def.name).c_str(), {72.f, 26.f}))
                 stats.ClearAchievement(def.name.c_str());
             ImGui::PopStyleColor(4);
         } else {
@@ -798,7 +842,7 @@ void StarOverlay::render_panel()
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, v4(0x1a,0x2c,0x44, 1.f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive,  v4(0x1e,0x36,0x54, 1.f));
             ImGui::PushStyleColor(ImGuiCol_Text,          v4(P_ACC, 1.f));
-            if (ImGui::Button(("Unlock##" + def.name).c_str(), {62.f, 22.f}))
+            if (ImGui::Button(("Unlock##" + def.name).c_str(), {72.f, 26.f}))
                 stats.SetAchievement(def.name.c_str());
             ImGui::PopStyleColor(4);
         }
@@ -809,10 +853,17 @@ void StarOverlay::render_panel()
         dl->AddLine({sep_p.x, sep_p.y}, {sep_p.x+rw, sep_p.y}, col(P_SEP, 0.3f));
     }
 
-    if (s.achievements.empty()) {
+    if (s.achievements.empty() || shown == 0) {
+        const char* msg = s.achievements.empty()
+            ? "No achievements in STAR/achievements.json"
+            : "No achievements match your search";
+        ImGui::Dummy({0.f, 16.f});
         ImGui::PushFont(fsmall);
+        float msg_w = ImGui::CalcTextSize(msg).x;
+        float avail_w = ImGui::GetContentRegionAvail().x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail_w - msg_w) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, v4(P_DIM, 1.f));
-        ImGui::TextUnformatted("No achievements in STAR/achievements.json");
+        ImGui::TextUnformatted(msg);
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }

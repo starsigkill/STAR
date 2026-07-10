@@ -104,6 +104,9 @@ private:
     float scroll_current_y_  = 0.0f;
     int   cursor_show_count_offset_ = 0;
 
+    char  achievement_filter_[64] = {};
+    int   filter_mode_       = 0; // 0=all, 1=unlocked, 2=locked
+
     ID3D11Device*           device_        = nullptr;
     ID3D11DeviceContext*    context_       = nullptr;
     ID3D11RenderTargetView* rtv_           = nullptr;
