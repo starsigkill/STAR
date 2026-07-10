@@ -206,6 +206,15 @@ STAR_EXPORT bool SteamAPI_Init()
     return star_init_internal();
 }
 
+STAR_EXPORT ESteamAPIInitResult SteamAPI_InitFlat(char* pOutErrMsg)
+{
+    if (pOutErrMsg) {
+        pOutErrMsg[0] = '\0';
+    }
+    bool ok = star_init_internal();
+    return ok ? k_ESteamAPIInitResult_OK : k_ESteamAPIInitResult_FailedGeneric;
+}
+
 STAR_EXPORT bool SteamAPI_InitSafe(char* pszInternalCheckInterfaceVersions)
 {
     STAR_UNREFERENCED(pszInternalCheckInterfaceVersions);
@@ -993,6 +1002,320 @@ STAR_EXPORT EInputActionOrigin SteamAPI_ISteamInput_TranslateActionOrigin(ISteam
 {
     STAR_UNREFERENCED(self); STAR_UNREFERENCED(eDestinationInputType); STAR_UNREFERENCED(eSourceOrigin);
     return k_EInputActionOrigin_None;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamInput_SetInputActionManifestFilePath(ISteamInput* self, const char* pchInputActionManifestAbsolutePath)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pchInputActionManifestAbsolutePath);
+    return true;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_RunFrame(ISteamInput* self, bool bReservedValue)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(bReservedValue);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamInput_BWaitForData(ISteamInput* self, bool bWaitForever, uint32 unTimeout)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(bWaitForever); STAR_UNREFERENCED(unTimeout);
+    return false;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamInput_BNewDataAvailable(ISteamInput* self)
+{
+    STAR_UNREFERENCED(self);
+    return false;
+}
+
+STAR_EXPORT int SteamAPI_ISteamInput_GetConnectedControllers(ISteamInput* self, InputHandle_t* handlesOut)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(handlesOut);
+    return 0;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_EnableDeviceCallbacks(ISteamInput* self)
+{
+    STAR_UNREFERENCED(self);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_EnableActionEventCallbacks(ISteamInput* self, SteamInputActionEventCallbackPointer pCallback)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pCallback);
+}
+
+STAR_EXPORT InputActionSetHandle_t SteamAPI_ISteamInput_GetActionSetHandle(ISteamInput* self, const char* pszActionSetName)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pszActionSetName);
+    return 0;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_ActivateActionSet(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(actionSetHandle);
+}
+
+STAR_EXPORT InputActionSetHandle_t SteamAPI_ISteamInput_GetCurrentActionSet(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+    return 0;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_ActivateActionSetLayer(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetLayerHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(actionSetLayerHandle);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_DeactivateActionSetLayer(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetLayerHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(actionSetLayerHandle);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_DeactivateAllActionSetLayers(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+}
+
+STAR_EXPORT int SteamAPI_ISteamInput_GetActiveActionSetLayers(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t* handlesOut)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(handlesOut);
+    return 0;
+}
+
+STAR_EXPORT InputDigitalActionHandle_t SteamAPI_ISteamInput_GetDigitalActionHandle(ISteamInput* self, const char* pszActionName)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pszActionName);
+    return 0;
+}
+
+STAR_EXPORT InputDigitalActionData_t SteamAPI_ISteamInput_GetDigitalActionData(ISteamInput* self, InputHandle_t inputHandle, InputDigitalActionHandle_t digitalActionHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(digitalActionHandle);
+    InputDigitalActionData_t data{};
+    return data;
+}
+
+STAR_EXPORT int SteamAPI_ISteamInput_GetDigitalActionOrigins(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetHandle, InputDigitalActionHandle_t digitalActionHandle, EInputActionOrigin* originsOut)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(actionSetHandle); STAR_UNREFERENCED(digitalActionHandle); STAR_UNREFERENCED(originsOut);
+    return 0;
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetStringForDigitalActionName(ISteamInput* self, InputDigitalActionHandle_t eActionHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eActionHandle);
+    return "";
+}
+
+STAR_EXPORT InputAnalogActionHandle_t SteamAPI_ISteamInput_GetAnalogActionHandle(ISteamInput* self, const char* pszActionName)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pszActionName);
+    return 0;
+}
+
+STAR_EXPORT InputAnalogActionData_t SteamAPI_ISteamInput_GetAnalogActionData(ISteamInput* self, InputHandle_t inputHandle, InputAnalogActionHandle_t analogActionHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(analogActionHandle);
+    InputAnalogActionData_t data{};
+    return data;
+}
+
+STAR_EXPORT int SteamAPI_ISteamInput_GetAnalogActionOrigins(ISteamInput* self, InputHandle_t inputHandle, InputActionSetHandle_t actionSetHandle, InputAnalogActionHandle_t analogActionHandle, EInputActionOrigin* originsOut)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(actionSetHandle); STAR_UNREFERENCED(analogActionHandle); STAR_UNREFERENCED(originsOut);
+    return 0;
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetGlyphForActionOrigin(ISteamInput* self, EInputActionOrigin eOrigin)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eOrigin);
+    return "";
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetGlyphSVGForActionOrigin(ISteamInput* self, EInputActionOrigin eOrigin, uint32 unFlags)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eOrigin); STAR_UNREFERENCED(unFlags);
+    return "";
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetStringForActionOrigin(ISteamInput* self, EInputActionOrigin eOrigin)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eOrigin);
+    return "";
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetStringForAnalogActionName(ISteamInput* self, InputAnalogActionHandle_t eActionHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eActionHandle);
+    return "";
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_StopAnalogActionMomentum(ISteamInput* self, InputHandle_t inputHandle, InputAnalogActionHandle_t eAction)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eAction);
+}
+
+STAR_EXPORT InputMotionData_t SteamAPI_ISteamInput_GetMotionData(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+    InputMotionData_t data{};
+    return data;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_TriggerVibration(ISteamInput* self, InputHandle_t inputHandle, unsigned short usLeftSpeed, unsigned short usRightSpeed)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(usLeftSpeed); STAR_UNREFERENCED(usRightSpeed);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_TriggerVibrationExtended(ISteamInput* self, InputHandle_t inputHandle, unsigned short usLeftSpeed, unsigned short usRightSpeed, unsigned short usLeftTriggerSpeed, unsigned short usRightTriggerSpeed)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(usLeftSpeed); STAR_UNREFERENCED(usRightSpeed); STAR_UNREFERENCED(usLeftTriggerSpeed); STAR_UNREFERENCED(usRightTriggerSpeed);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_TriggerSimpleHapticEvent(ISteamInput* self, InputHandle_t inputHandle, EControllerHapticLocation eHapticLocation, uint8 nIntensity, char nGainDB, uint8 nOtherIntensity, char nOtherGainDB)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eHapticLocation); STAR_UNREFERENCED(nIntensity); STAR_UNREFERENCED(nGainDB); STAR_UNREFERENCED(nOtherIntensity); STAR_UNREFERENCED(nOtherGainDB);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_SetLEDColor(ISteamInput* self, InputHandle_t inputHandle, uint8 nColorR, uint8 nColorG, uint8 nColorB, unsigned int nFlags)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(nColorR); STAR_UNREFERENCED(nColorG); STAR_UNREFERENCED(nColorB); STAR_UNREFERENCED(nFlags);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_TriggerHapticPulse(ISteamInput* self, InputHandle_t inputHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eTargetPad); STAR_UNREFERENCED(usDurationMicroSec);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_TriggerRepeatedHapticPulse(ISteamInput* self, InputHandle_t inputHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec, unsigned short usOffMicroSec, unsigned short unRepeat, unsigned int nFlags)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eTargetPad); STAR_UNREFERENCED(usDurationMicroSec); STAR_UNREFERENCED(usOffMicroSec); STAR_UNREFERENCED(unRepeat); STAR_UNREFERENCED(nFlags);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_Legacy_TriggerHapticPulse(ISteamInput* self, InputHandle_t inputHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eTargetPad); STAR_UNREFERENCED(usDurationMicroSec);
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_Legacy_TriggerRepeatedHapticPulse(ISteamInput* self, InputHandle_t inputHandle, ESteamControllerPad eTargetPad, unsigned short usDurationMicroSec, unsigned short usOffMicroSec, unsigned short unRepeat, unsigned int nFlags)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eTargetPad); STAR_UNREFERENCED(usDurationMicroSec); STAR_UNREFERENCED(usOffMicroSec); STAR_UNREFERENCED(unRepeat); STAR_UNREFERENCED(nFlags);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamInput_ShowBindingPanel(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+    return false;
+}
+
+STAR_EXPORT ESteamInputType SteamAPI_ISteamInput_GetInputTypeForHandle(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+    return k_ESteamInputType_Unknown;
+}
+
+STAR_EXPORT InputHandle_t SteamAPI_ISteamInput_GetControllerForGamepadIndex(ISteamInput* self, int nIndex)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(nIndex);
+    return 0;
+}
+
+STAR_EXPORT int SteamAPI_ISteamInput_GetGamepadIndexForController(ISteamInput* self, InputHandle_t ulinputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(ulinputHandle);
+    return -1;
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetStringForXboxOrigin(ISteamInput* self, EXboxOrigin eOrigin)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eOrigin);
+    return "";
+}
+
+STAR_EXPORT const char* SteamAPI_ISteamInput_GetGlyphForXboxOrigin(ISteamInput* self, EXboxOrigin eOrigin)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eOrigin);
+    return "";
+}
+
+STAR_EXPORT EInputActionOrigin SteamAPI_ISteamInput_GetActionOriginFromXboxOrigin(ISteamInput* self, InputHandle_t inputHandle, EXboxOrigin eOrigin)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(eOrigin);
+    return k_EInputActionOrigin_None;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamInput_GetDeviceBindingRevision(ISteamInput* self, InputHandle_t inputHandle, int* pMajor, int* pMinor)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(pMajor); STAR_UNREFERENCED(pMinor);
+    return false;
+}
+
+STAR_EXPORT uint32 SteamAPI_ISteamInput_GetRemotePlaySessionID(ISteamInput* self, InputHandle_t inputHandle)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle);
+    return 0;
+}
+
+STAR_EXPORT uint16 SteamAPI_ISteamInput_GetSessionInputConfigurationSettings(ISteamInput* self)
+{
+    STAR_UNREFERENCED(self);
+    return 0;
+}
+
+STAR_EXPORT void SteamAPI_ISteamInput_SetDualSenseTriggerEffect(ISteamInput* self, InputHandle_t inputHandle, const ScePadTriggerEffectParam* pParam)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(inputHandle); STAR_UNREFERENCED(pParam);
+}
+
+STAR_EXPORT ScreenshotHandle SteamAPI_ISteamScreenshots_WriteScreenshot(ISteamScreenshots* self, void* pubRGB, uint32 cubRGB, int nWidth, int nHeight)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pubRGB); STAR_UNREFERENCED(cubRGB); STAR_UNREFERENCED(nWidth); STAR_UNREFERENCED(nHeight);
+    return 0;
+}
+
+STAR_EXPORT ScreenshotHandle SteamAPI_ISteamScreenshots_AddScreenshotToLibrary(ISteamScreenshots* self, const char* pchFilename, const char* pchThumbnailFilename, int nWidth, int nHeight)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(pchFilename); STAR_UNREFERENCED(pchThumbnailFilename); STAR_UNREFERENCED(nWidth); STAR_UNREFERENCED(nHeight);
+    return 0;
+}
+
+STAR_EXPORT void SteamAPI_ISteamScreenshots_TriggerScreenshot(ISteamScreenshots* self)
+{
+    STAR_UNREFERENCED(self);
+}
+
+STAR_EXPORT void SteamAPI_ISteamScreenshots_HookScreenshots(ISteamScreenshots* self, bool bHook)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(bHook);
+}
+
+STAR_EXPORT bool SteamAPI_ISteamScreenshots_SetLocation(ISteamScreenshots* self, ScreenshotHandle hScreenshot, const char* pchLocation)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(hScreenshot); STAR_UNREFERENCED(pchLocation);
+    return false;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamScreenshots_TagUser(ISteamScreenshots* self, ScreenshotHandle hScreenshot, uint64 steamID)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(hScreenshot); STAR_UNREFERENCED(steamID);
+    return false;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamScreenshots_TagPublishedFile(ISteamScreenshots* self, ScreenshotHandle hScreenshot, PublishedFileId_t unPublishedFileID)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(hScreenshot); STAR_UNREFERENCED(unPublishedFileID);
+    return false;
+}
+
+STAR_EXPORT bool SteamAPI_ISteamScreenshots_IsScreenshotsHooked(ISteamScreenshots* self)
+{
+    STAR_UNREFERENCED(self);
+    return false;
+}
+
+STAR_EXPORT ScreenshotHandle SteamAPI_ISteamScreenshots_AddVRScreenshotToLibrary(ISteamScreenshots* self, EVRScreenshotType eType, const char* pchFilename, const char* pchVRFilename)
+{
+    STAR_UNREFERENCED(self); STAR_UNREFERENCED(eType); STAR_UNREFERENCED(pchFilename); STAR_UNREFERENCED(pchVRFilename);
+    return 0;
 }
 
 STAR_EXPORT bool SteamAPI_ISteamInventory_GenerateItems(ISteamInventory* self, SteamInventoryResult_t* pResultHandle, const SteamItemDef_t* pArrayItemDefs, const uint32* punArrayQuantity, uint32 unArrayLength)

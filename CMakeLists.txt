@@ -84,6 +84,7 @@ set(STAR_SOURCES
     src/core/integrity_hooks.cpp
     src/core/settings.cpp
     src/core/star_api.cpp
+    src/core/star_flat_stubs.cpp
     src/core/storage.cpp
     src/overlay/overlay.cpp
     src/steam/steam_applist.cpp
