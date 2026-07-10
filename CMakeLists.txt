@@ -175,9 +175,8 @@ endif()
 add_library(version_proxy SHARED src/proxy/version.cpp)
 set_target_properties(version_proxy PROPERTIES OUTPUT_NAME "version")
 
-add_library(baselib_proxy SHARED src/proxy/baselib.cpp)
+add_library(baselib_proxy SHARED src/proxy/baselib.cpp src/proxy/baselib.def)
 set_target_properties(baselib_proxy PROPERTIES
     OUTPUT_NAME "baselib"
-    LINK_FLAGS "/DEF:${CMAKE_SOURCE_DIR}/src/proxy/baselib.def"
 )
 
