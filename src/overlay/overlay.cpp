@@ -1386,7 +1386,11 @@ void StarOverlay::on_present_dx9(IDirect3DDevice9* device)
             state_block->Capture();
         }
 
-        ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+        HRESULT scene_hr = device->BeginScene();
+        if (SUCCEEDED(scene_hr)) {
+            ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
+            device->EndScene();
+        }
 
         if (state_block) {
             state_block->Apply();

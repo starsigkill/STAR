@@ -151,6 +151,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 static bool star_init_internal()
 {
     STAR_install_integrity_hooks();
+    STAR_install_il2cpp_hooks_deferred();
     if (g_initialized) return true;
 
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);

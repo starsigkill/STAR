@@ -279,6 +279,173 @@ static bool install_hook(LPVOID pTarget, LPVOID pDetour, LPVOID* ppOriginal, con
     return true;
 }
 
+extern "C" void STAR_install_integrity_hooks();
+
+typedef void* (*il2cpp_domain_get_t)();
+typedef void** (*il2cpp_domain_get_assemblies_t)(void* domain, size_t* size);
+typedef void* (*il2cpp_assembly_get_image_t)(void* assembly);
+typedef void* (*il2cpp_class_from_name_t)(void* image, const char* namespaze, const char* name);
+typedef void* (*il2cpp_class_get_method_from_name_t)(void* klass, const char* name, int argsCount);
+typedef void* (*il2cpp_class_get_fields_t)(void* klass, void** iter);
+typedef const char* (*il2cpp_field_get_name_t)(void* field);
+typedef size_t (*il2cpp_field_get_offset_t)(void* field);
+typedef uint32_t (*il2cpp_field_get_flags_t)(void* field);
+typedef void* (*il2cpp_class_get_field_from_name_t)(void* klass, const char* name);
+typedef void (*il2cpp_field_static_set_value_t)(void* field, void* value);
+
+typedef void (*OnRelayNetworkStatusReceived_t)(void* __this, void* param, void* method);
+static OnRelayNetworkStatusReceived_t orig_OnRelayNetworkStatusReceived = nullptr;
+
+typedef void (*SteamManager_Awake_t)(void* __this, void* method);
+static SteamManager_Awake_t orig_SteamManager_Awake = nullptr;
+
+static int g_offset_RelayNetworkAvailable = -1;
+static int g_offset_NetworkNotAvailable = -1;
+static int g_offset_enable = -1;
+
+static void hooked_OnRelayNetworkStatusReceived(void* __this, void* param, void* method)
+{
+    STAR_LOG("OnRelayNetworkStatusReceived: Bypassed call to prevent IndexOutOfRangeException!");
+    if (__this) {
+        if (g_offset_RelayNetworkAvailable != -1) {
+            *(bool*)((char*)__this + g_offset_RelayNetworkAvailable) = true;
+        }
+        if (g_offset_NetworkNotAvailable != -1) {
+            *(bool*)((char*)__this + g_offset_NetworkNotAvailable) = false;
+        }
+        STAR_LOG("OnRelayNetworkStatusReceived: Manually set RelayNetworkAvailable = true, NetworkNotAvailable = false!");
+    }
+}
+
+static void hooked_SteamManager_Awake(void* __this, void* method)
+{
+    STAR_LOG("SteamManager_Awake: Intercepted Awake call.");
+    if (orig_SteamManager_Awake) {
+        orig_SteamManager_Awake(__this, method);
+    }
+    if (__this && g_offset_enable != -1) {
+        *(bool*)((char*)__this + g_offset_enable) = true;
+        STAR_LOG("SteamManager_Awake: Forced enable = true");
+    }
+}
+
+static std::atomic<bool> g_il2cpp_hooks_installed{ false };
+
+static bool install_il2cpp_hooks()
+{
+    HMODULE hGameAssembly = GetModuleHandleA("GameAssembly.dll");
+    if (!hGameAssembly) return false;
+
+    auto il2cpp_domain_get = (il2cpp_domain_get_t)GetProcAddress(hGameAssembly, "il2cpp_domain_get");
+    auto il2cpp_domain_get_assemblies = (il2cpp_domain_get_assemblies_t)GetProcAddress(hGameAssembly, "il2cpp_domain_get_assemblies");
+    auto il2cpp_assembly_get_image = (il2cpp_assembly_get_image_t)GetProcAddress(hGameAssembly, "il2cpp_assembly_get_image");
+    auto il2cpp_class_from_name = (il2cpp_class_from_name_t)GetProcAddress(hGameAssembly, "il2cpp_class_from_name");
+    auto il2cpp_class_get_method_from_name = (il2cpp_class_get_method_from_name_t)GetProcAddress(hGameAssembly, "il2cpp_class_get_method_from_name");
+    auto il2cpp_class_get_fields = (il2cpp_class_get_fields_t)GetProcAddress(hGameAssembly, "il2cpp_class_get_fields");
+    auto il2cpp_field_get_name = (il2cpp_field_get_name_t)GetProcAddress(hGameAssembly, "il2cpp_field_get_name");
+    auto il2cpp_field_get_offset = (il2cpp_field_get_offset_t)GetProcAddress(hGameAssembly, "il2cpp_field_get_offset");
+    auto il2cpp_field_get_flags = (il2cpp_field_get_flags_t)GetProcAddress(hGameAssembly, "il2cpp_field_get_flags");
+    auto il2cpp_field_static_set_value = (il2cpp_field_static_set_value_t)GetProcAddress(hGameAssembly, "il2cpp_field_static_set_value");
+
+    if (!il2cpp_domain_get || !il2cpp_domain_get_assemblies || !il2cpp_assembly_get_image ||
+        !il2cpp_class_from_name || !il2cpp_class_get_method_from_name) {
+        return false;
+    }
+
+    void* domain = il2cpp_domain_get();
+    if (!domain) return false;
+
+    size_t size = 0;
+    void** assemblies = il2cpp_domain_get_assemblies(domain, &size);
+    if (!assemblies || size == 0) return false;
+
+    bool found_steam_manager = false;
+
+    for (size_t i = 0; i < size; ++i) {
+        void* assembly = assemblies[i];
+        void* image = il2cpp_assembly_get_image(assembly);
+        if (!image) continue;
+
+        void* klass = il2cpp_class_from_name(image, "", "SteamManager");
+        if (!klass) {
+            klass = il2cpp_class_from_name(image, "Steamworks", "SteamManager");
+        }
+        if (klass) {
+            found_steam_manager = true;
+            if (il2cpp_class_get_fields && il2cpp_field_get_name && il2cpp_field_get_offset) {
+                void* iter = nullptr;
+                while (void* field = il2cpp_class_get_fields(klass, &iter)) {
+                    const char* name = il2cpp_field_get_name(field);
+                    size_t offset = il2cpp_field_get_offset(field);
+                    if (name) {
+                        if (strcmp(name, "<RelayNetworkAvailable>k__BackingField") == 0) {
+                            g_offset_RelayNetworkAvailable = (int)offset;
+                        }
+                        else if (strcmp(name, "<NetworkNotAvailable>k__BackingField") == 0) {
+                            g_offset_NetworkNotAvailable = (int)offset;
+                        }
+                        else if (strcmp(name, "enable") == 0) {
+                            uint32_t flags = il2cpp_field_get_flags ? il2cpp_field_get_flags(field) : 0;
+                            bool is_static = (flags & 0x0010) != 0;
+                            if (is_static) {
+                                if (il2cpp_field_static_set_value) {
+                                    bool true_val = true;
+                                    il2cpp_field_static_set_value(field, &true_val);
+                                    STAR_LOG("STAR_install_il2cpp_hooks: Set static enable = true");
+                                }
+                            } else {
+                                g_offset_enable = (int)offset;
+                            }
+                        }
+                    }
+                }
+                if (g_offset_RelayNetworkAvailable != -1 || g_offset_NetworkNotAvailable != -1 || g_offset_enable != -1) {
+                    STAR_LOG("STAR_install_il2cpp_hooks: Resolved RelayNetworkAvailable=%d NetworkNotAvailable=%d enable=%d",
+                        g_offset_RelayNetworkAvailable, g_offset_NetworkNotAvailable, g_offset_enable);
+                }
+            }
+
+            if (g_offset_enable != -1) {
+                void* awake_method = il2cpp_class_get_method_from_name(klass, "Awake", 0);
+                if (awake_method) {
+                    void* methodPointer = *(void**)awake_method;
+                    if (methodPointer) {
+                        if (MH_CreateHook(methodPointer, (LPVOID)&hooked_SteamManager_Awake, (LPVOID*)&orig_SteamManager_Awake) == MH_OK) {
+                            if (MH_EnableHook(methodPointer) == MH_OK) {
+                                STAR_LOG("STAR_install_il2cpp_hooks: Hooked SteamManager.Awake to force enable");
+                            }
+                        }
+                    }
+                }
+            }
+
+            void* method = il2cpp_class_get_method_from_name(klass, "OnRelayNetworkStatusReceived", 1);
+            if (method) {
+                void* methodPointer = *(void**)method;
+                if (methodPointer) {
+                    if (MH_CreateHook(methodPointer, (LPVOID)&hooked_OnRelayNetworkStatusReceived, (LPVOID*)&orig_OnRelayNetworkStatusReceived) == MH_OK) {
+                        if (MH_EnableHook(methodPointer) == MH_OK) {
+                            STAR_LOG("STAR_install_il2cpp_hooks: Hooked SteamManager.OnRelayNetworkStatusReceived to bypass relay crash");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return found_steam_manager;
+}
+
+extern "C" void STAR_install_il2cpp_hooks_deferred()
+{
+    bool expected = false;
+    if (!g_il2cpp_hooks_installed.compare_exchange_strong(expected, true)) return;
+
+    if (!install_il2cpp_hooks()) {
+        g_il2cpp_hooks_installed = false; // Try again on next initialization call
+    }
+}
+
 extern "C" void STAR_install_integrity_hooks()
 {
     bool expected = false;
@@ -302,6 +469,8 @@ extern "C" void STAR_install_integrity_hooks()
     install_hook(GetProcAddress(hKernel32, "GetFileAttributesA"), (LPVOID)&hooked_GetFileAttributesA, (LPVOID*)&orig_GetFileAttributesA, "GetFileAttributesA");
     install_hook(GetProcAddress(hKernel32, "GetFileAttributesExW"), (LPVOID)&hooked_GetFileAttributesExW, (LPVOID*)&orig_GetFileAttributesExW, "GetFileAttributesExW");
     install_hook(GetProcAddress(hKernel32, "GetFileAttributesExA"), (LPVOID)&hooked_GetFileAttributesExA, (LPVOID*)&orig_GetFileAttributesExA, "GetFileAttributesExA");
+
+    STAR_install_il2cpp_hooks_deferred();
 }
 
 void STAR_uninstall_integrity_hooks()
